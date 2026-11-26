@@ -886,8 +886,8 @@ final List<String> _igMessages = <String>[];
 final List<Rect> _igKeyRects = <Rect>[];
 final List<String> _igKeyLabels = <String>[];
 Rect _igDlgOK = Rect.zero, _igDlgCancel = Rect.zero, _igDlgClose = Rect.zero;
-Offset _igStickBase = Offset.zero, _igKnob = Offset.zero;
-bool _igStickDown = false;
+Image? _igBg, _igSkin;
+Rect _igDlgLoginBtn = Rect.zero;
 
 typedef _MallocNative = ffi.Pointer<ffi.Void> Function(ffi.UintPtr);
 typedef _MallocDart = ffi.Pointer<ffi.Void> Function(int);
@@ -898,6 +898,17 @@ typedef _SubmitDart = int Function(int, int, ffi.Pointer<ffi.Void>, int);
 _ReadDart? _igReadMetrics;
 _SubmitDart? _igSubmit;
 ffi.Pointer<ffi.Void>? _igBuf;
+
+void _igLoadAssets() {
+  loadImage('assets/auth/auth_bg.png').then((v) {
+    _igBg = v;
+    window.scheduleFrame();
+  });
+  loadImage('assets/auth/auth_skin.png').then((v) {
+    _igSkin = v;
+    window.scheduleFrame();
+  });
+}
 
 void _igInitNative() {
   try {
@@ -1061,31 +1072,90 @@ void _igKey(String k) {
 }
 
 void _igDrawDialog(Canvas c) {
-  // Panou dialog (stil SA-MP): titlu, text, camp de introducere, OK / Cancel.
-  final w = math.min(_w * 0.6, dp(520));
-  final h = dp(300);
-  final box = Rect.fromLTWH((_w - w) / 2, (_h - h) / 2 - dp(20), w, h);
-  _round(c, box, dp(10), const Color(0xF2101218), stroke: const Color(0xFFE8A93B), sw: dp(2));
-  _txt(c, 'BLACK MOLDOW', box.left, box.top + dp(14), dp(16), _cGold,
-      align: TextAlign.center, width: box.width);
-  _txt(c, 'Introdu parola contului:', box.left, box.top + dp(46), dp(12), _cWhite,
-      align: TextAlign.center, width: box.width);
+  // Reproducere 1:1 a login_layout.xml din proiectul Android.
+  // Fundal: @drawable/auth_bg
+  c.drawRect(Offset.zero & Size(_w, _h), Paint()..color = const Color(0xFF0B0B10));
+  if (_igBg != null) {
+    c.drawImageRect(_igBg!, Rect.fromLTWH(0, 0, _igBg!.width.toDouble(), _igBg!.height.toDouble()),
+        Offset.zero & Size(_w, _h), Paint());
+  }
+  // @drawable/auth_grd : gradient #EA161C24 -> #EB241416, unghi 135
+  for (int i = 0; i < 32; i++) {
+    final t = i / 31;
+    c.drawRect(Rect.fromLTWH(0, _h * t, _w, _h / 31 + 1),
+        Paint()..color = Color.fromARGB(0xEA, 0x16 + ((0x24 - 0x16) * t).round(),
+            0x1c - ((0x1c - 0x14) * t).round(), 0x24 - ((0x24 - 0x16) * t).round()));
+  }
+  c.drawRect(Offset.zero & Size(_w, _h), Paint()..color = const Color(0x66000000));
 
-  final field = Rect.fromLTWH(box.left + dp(24), box.top + dp(72), box.width - dp(48), dp(34));
-  _round(c, field, dp(6), const Color(0xFF050508), stroke: const Color(0x88FFC62E));
-  final masked = '*' * _igInput.length;
-  _txt(c, masked, field.left + dp(9), field.top + dp(7), dp(14), _cWhite, bold: false);
+  // Texte sus-stanga (muller_bold 20sp)
+  _igText(c, 'Bine ai venit pe', dp(22), dp(22), dp(20), const Color(0xFFFFFFFF), 'MullerBd');
+  _igText(c, 'BLACK MOLDOW', dp(22), dp(48), dp(20), const Color(0xFFFF0000), 'MullerBd');
 
-  _igDlgOK = Rect.fromLTWH(box.left + box.width / 2 + dp(6), box.top + dp(112), dp(90), dp(30));
-  _igDlgCancel = Rect.fromLTWH(box.left + box.width / 2 - dp(96), box.top + dp(112), dp(90), dp(30));
-  _round(c, _igDlgOK, dp(6), const Color(0xFFFFC933));
-  _txt(c, 'OK', _igDlgOK.left, _igDlgOK.top + dp(7), dp(12), const Color(0xFF111318),
-      align: TextAlign.center, width: _igDlgOK.width);
-  _round(c, _igDlgCancel, dp(6), const Color(0x33FFFFFF), stroke: const Color(0x66FFFFFF));
-  _txt(c, 'ANULARE', _igDlgCancel.left, _igDlgCancel.top + dp(7), dp(11), _cWhite,
-      align: TextAlign.center, width: _igDlgCancel.width);
+  // Personaj stanga (170x241 dp, @drawable/auth_skin)
+  final skin = Rect.fromLTWH(dp(12), _h - dp(241), dp(170), dp(241));
+  if (_igSkin != null) {
+    c.drawImageRect(_igSkin!, Rect.fromLTWH(0, 0, _igSkin!.width.toDouble(), _igSkin!.height.toDouble()),
+        skin, Paint());
+  } else {
+    _round(c, skin, dp(4), const Color(0xFF16161C), stroke: const Color(0x33FFFFFF));
+  }
 
-  // TastaturaQWERTY in partea de jos a dialogului.
+  // Bara HP (64x9 dp) deasupra personajului
+  final hp = Rect.fromLTWH(skin.left, skin.top - dp(15), dp(64), dp(9));
+  _round(c, hp, 0, const Color(0xFF4A0D11), stroke: const Color(0xFF000000), sw: dp(2));
+  c.drawRect(Rect.fromLTWH(hp.left + dp(2), hp.top + dp(2), dp(41), dp(5)),
+      Paint()..color = const Color(0xFFBA121C));
+  // Nickname deasupra HP
+  _igText(c, _nick, skin.left, hp.top - dp(21), dp(14), const Color(0xFFFFFFFF), 'MontserratMd');
+
+  // Divider vertical centru (@drawable/auth_divider)
+  final dx = _w / 2 - dp(2.5);
+  for (int i = 0; i < 16; i++) {
+    final t = i / 15;
+    final a = (0x33 * math.sin(t * math.pi)).round();
+    c.drawRect(Rect.fromLTWH(dx, _h * t, dp(5), _h / 16 + 1),
+        Paint()..color = Color.fromARGB(a, 255, 255, 255));
+  }
+
+  // Formular dreapta: 263 dp latime, marginEnd 20 dp, centrat vertical
+  final fw = dp(263);
+  final fx = _w - fw - dp(20);
+  final fh = dp(186);
+  final fy = (_h - fh) / 2;
+
+  // @drawable/auth_input : #8014161C, border #BA121C 1dp, radius 6dp
+  Rect field(double y) => Rect.fromLTWH(fx, y, fw, dp(50));
+  final f1 = field(fy);
+  _round(c, f1, dp(6), const Color(0x8014161C), stroke: const Color(0xFFBA121C), sw: dp(1));
+  _igText(c, 'Login', f1.left + dp(9), f1.top + dp(5), dp(10), const Color(0x80FFFFFF), 'MontserratMd');
+  _igText(c, _nick, f1.left + dp(10), f1.top + dp(17), dp(13), const Color(0xFFFFFFFF), 'MontserratMd');
+
+  final f2 = field(f1.bottom + dp(12));
+  _round(c, f2, dp(6), const Color(0x8014161C), stroke: const Color(0xFFBA121C), sw: dp(1));
+  _igText(c, 'Parola', f2.left + dp(9), f2.top + dp(5), dp(10), const Color(0x80FFFFFF), 'MontserratMd');
+  _igText(c, '*' * _igInput.length, f2.left + dp(10), f2.top + dp(17), dp(15),
+      const Color(0xFFFFFFFF), 'MontserratMd');
+  // Cursor
+  if (_igFrame % 60 < 30) {
+    final cx = f2.left + dp(10) + dp(_igInput.length * 15 * 0.62);
+    c.drawRect(Rect.fromLTWH(cx, f2.top + dp(17), dp(1.5), dp(18)),
+        Paint()..color = const Color(0xFFBA121C));
+  }
+
+  _igText(c, 'Recuperare parolă?', f2.right - dp(100), f2.bottom + dp(6), dp(10),
+      const Color(0xB0B0B0), 'MontserratMd');
+
+  // @drawable/auth_enter_btn + text "Intră" (muller_bold 17sp)
+  final btn = Rect.fromLTWH(fx, f2.bottom + dp(30), fw, dp(50));
+  _round(c, btn, dp(6), const Color(0xFFBA121C), stroke: const Color(0xFFFFFFFF), sw: dp(1.5));
+  _igText(c, 'Intră', btn.left, btn.top + dp(14), dp(17), const Color(0xFFFFFFFF), 'MullerBd',
+      align: TextAlign.center, width: btn.width);
+  _igDlgOK = btn;
+  _igDlgCancel = Rect.fromLTWH(fx, btn.bottom + dp(8), fw, dp(28));
+  _igPill(c, _igDlgCancel, 'ANULARE');
+
+  // Tastatura QWERTY in partea de jos (folosita la introducerea parolei).
   _igKeyRects.clear();
   _igKeyLabels.clear();
   final rows = _igDkPage == 0
@@ -1099,22 +1169,32 @@ void _igDrawDialog(Canvas c) {
           ['-', '@', '_', '.', ',', '!', '?', ':', '#', '/'],
           ['ABC', '␣', '⌫'],
         ];
-  final kw = dp(32), kh = dp(32), gap = dp(3);
-  final y0 = box.top + dp(152);
+  final kw = dp(30), kh = dp(28), gap = dp(3);
+  final y0 = _h - 3 * (kh + gap) - dp(4);
   for (int r = 0; r < rows.length; r++) {
     final row = rows[r];
     final tw = row.length * kw + (row.length - 1) * gap;
-    final x0 = box.left + (box.width - tw) / 2;
+    final x0 = (_w - tw) / 2;
     for (int i = 0; i < row.length; i++) {
       final kr = Rect.fromLTWH(x0 + i * (kw + gap), y0 + r * (kh + gap), kw, kh);
       _round(c, kr, dp(4), const Color(0x3AFFFFFF), stroke: const Color(0x22FFFFFF));
-      _txt(c, row[i], kr.left, kr.top + dp(8), dp(11), _cWhite, align: TextAlign.center, width: kw);
+      _txt(c, row[i], kr.left, kr.top + dp(7), dp(11), _cWhite,
+          align: TextAlign.center, width: kw);
       _igKeyRects.add(kr);
       _igKeyLabels.add(row[i]);
     }
   }
 }
 
+void _igText(Canvas c, String s, double x, double y, double size, Color color, String family,
+    {TextAlign align = TextAlign.left, double? width}) {
+  final pb = ParagraphBuilder(ParagraphStyle(textAlign: align))
+    ..pushStyle(TextStyle(fontFamily: family, fontSize: size, color: color, height: 1))
+    ..addText(s)
+    ..pop();
+  final p = pb.build()..layout(ParagraphConstraints(width: width ?? 2000));
+  c.drawParagraph(p, Offset(x, y));
+}
 void _drawInGame(Canvas c) {
   _w = window.physicalSize.width;
   _h = window.physicalSize.height;
@@ -1162,38 +1242,11 @@ void _drawInGame(Canvas c) {
         k < 0 ? _cGold : const Color(0x55FFFFFF), align: TextAlign.center, width: dp(14));
   }
 
-  // --- Controale touch stil GTA SA Mobile ---
-  // Stick stanga: baza translucida + inel alb + knob care urmareste degetul.
-  final stickC = Offset(dp(86), _h - dp(92));
-  _igStickBase = stickC;
-  c.drawCircle(stickC, dp(54), Paint()..color = const Color(0x2A000000));
-  c.drawCircle(stickC, dp(54), Paint()
-    ..color = const Color(0x8CFFFFFF)..style = PaintingStyle.stroke..strokeWidth = dp(2));
-  c.drawCircle(stickC, dp(42), Paint()..color = const Color(0x18FFFFFF));
-  final knob = stickC + _igKnob;
-  c.drawCircle(knob, dp(21), Paint()..color = const Color(0x99222226));
-  c.drawCircle(knob, dp(21), Paint()
-    ..color = const Color(0xCCFFFFFF)..style = PaintingStyle.stroke..strokeWidth = dp(2));
-  c.drawCircle(knob, dp(7), Paint()..color = const Color(0x88FFFFFF));
-
-  // Cluster de actiune dreapta: butoane rotunde, GTA-style.
+  // Controalele touch (stick, sarit, lovit etc.) sunt desenate de engine.
+  // Nu mai suprapunem butoane proprii peste ele.
   final br = _h - dp(40);
-  _igCircle(c, Offset(_w - dp(70), br - dp(58)), dp(40), 'FIRE',
-      fill: const Color(0x66B01E1E), ring: const Color(0xDFFFFFFF));
-  _igCircle(c, Offset(_w - dp(146), br - dp(40)), dp(27), 'AIM',
-      fill: const Color(0x55222226), ring: const Color(0xAAFFFFFF));
-  _igCircle(c, Offset(_w - dp(150), br - dp(116)), dp(27), 'RUN',
-      fill: const Color(0x55222226), ring: const Color(0xAAFFFFFF));
-  _igCircle(c, Offset(_w - dp(226), br - dp(82)), dp(27), 'JUMP',
-      fill: const Color(0x55222226), ring: const Color(0xAAFFFFFF));
-  _igCircle(c, Offset(_w - dp(40), br - dp(146)), dp(23), 'E',
-      fill: const Color(0x55222226), ring: const Color(0xAAFFFFFF));
-
-  // Butoane mici jos-centru: chat / tab / harta / login.
-  _igPill(c, Rect.fromLTWH(dp(158), br - dp(26), dp(42), dp(26)), 'CHAT');
-  _igPill(c, Rect.fromLTWH(dp(205), br - dp(26), dp(38), dp(26)), 'TAB');
-  _igPill(c, Rect.fromLTWH(dp(248), br - dp(26), dp(38), dp(26)), 'MAP');
-  _igPill(c, Rect.fromLTWH(dp(292), br - dp(26), dp(48), dp(26)), 'LOGIN', gold: true);
+  _igDlgLoginBtn = Rect.fromLTWH(dp(14), br - dp(28), dp(56), dp(26));
+  _igPill(c, _igDlgLoginBtn, 'LOGIN', gold: true);
 
   // --- Panou chat ---
   if (_igChatOpen) {
@@ -1223,30 +1276,6 @@ void _drawInGame(Canvas c) {
 void _igPointer(PointerDataPacket packet) {
   for (final d in packet.data) {
     final p = Offset(d.physicalX, d.physicalY);
-    // Stick-ul urmareste degetul.
-    if (_igStickDown &&
-        (d.change == PointerChange.move ||
-            d.change == PointerChange.down ||
-            d.change == PointerChange.up)) {
-      final delta = p - _igStickBase;
-      final len = delta.distance;
-      _igKnob = len > dp(42) ? delta * (dp(42) / len) : delta;
-      if (d.change == PointerChange.up) {
-        _igStickDown = false;
-        _igKnob = Offset.zero;
-      }
-      window.scheduleFrame();
-    }
-    if (d.change == PointerChange.down &&
-        !_igDialogOpen &&
-        (p - _igStickBase).distance < dp(58)) {
-      _igStickDown = true;
-      final delta = p - _igStickBase;
-      final len = delta.distance;
-      _igKnob = len > dp(42) ? delta * (dp(42) / len) : delta;
-      window.scheduleFrame();
-      continue;
-    }
     if (d.change != PointerChange.down) continue;
     if (_igDialogOpen) {
       if (_igDlgOK.contains(p)) {
@@ -1268,15 +1297,14 @@ void _igPointer(PointerDataPacket packet) {
       window.scheduleFrame();
       continue;
     }
-    final br = _h - dp(40);
-    if ((Offset(dp(316), br - dp(13)) - p).distance < dp(42)) {
+    if (_igDlgLoginBtn.contains(p)) {
       _igDialogOpen = true;
       _igInput = _password;
       _igDkShift = false;
       _igDkPage = 0;
-    } else if ((Offset(dp(179), br - dp(13)) - p).distance < dp(36)) {
+    } else if ((Offset(dp(179), _h - dp(53)) - p).distance < dp(36)) {
       _igChatOpen = !_igChatOpen;
-    } else if ((Offset(dp(224), br - dp(13)) - p).distance < dp(36)) {
+    } else if ((Offset(dp(224), _h - dp(53)) - p).distance < dp(36)) {
       _igScoreOpen = !_igScoreOpen;
     }
     window.scheduleFrame();
@@ -1296,6 +1324,8 @@ void _igHandshake() {
 @pragma('vm:entry-point')
 void ingameMain() {
   _igInitNative();
+  _igLoadAssets();
+  _igDialogOpen = true; // se deschide la conectarea pe server (ca pe Android)
   _igHandshake();
   window.onPlatformMessage = _igMsg;
   window.onPointerDataPacket = _igPointer;
