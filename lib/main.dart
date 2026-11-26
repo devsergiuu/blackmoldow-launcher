@@ -499,9 +499,97 @@ void _pointer(PointerDataPacket packet) {
   }
 }
 
+// ---- raspuns StandardMethodCodec: 0 (success) + 7 (string) + size + utf8 ----
+String? _replyString(ByteData? r) {
+  if (r == null || r.lengthInBytes < 3) return null;
+  final b = Uint8List.sublistView(r);
+  int i = 0;
+  if (b[i++] != 0 || b[i++] != 7) return null;
+  int n = b[i++];
+  if (n == 255) {
+    if (i + 4 > b.length) return null;
+    n = b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24);
+    i += 4;
+  }
+  if (i + n > b.length) return null;
+  return utf8.decode(b.sublist(i, i + n));
+}
+
+Future<String> _installRoot() async {
+  final r = await _send(_channelHost, _call('installRootURL', <String, Object?>{}));
+  String? s = _replyString(r);
+  if (s != null && s.isNotEmpty) {
+    if (s.startsWith('file://')) s = s.substring(7);
+    return s;
+  }
+  final home = Platform.environment['HOME'];
+  return home == null ? 'Documents' : '$home/Documents';
+}
+
+Future<List<Object?>> _manifest() async {
+  final client = HttpClient();
+  try {
+    final req = await client.getUrl(Uri.parse('https://resa-mp.com/api/game-files'));
+    final resp = await req.close();
+    final body = await utf8.decoder.bind(resp).join();
+    final data = jsonDecode(body);
+    return (data['files'] as List).cast<Object?>();
+  } finally {
+    client.close();
+  }
+}
+
+Future<void> _downloadFiles(List<Object?> files, String root) async {
+  await _send(_channelHost, _call('beginDownloadBackgroundTask', <String, Object?>{}));
+  final client = HttpClient();
+  try {
+    for (int i = 0; i < files.length; i++) {
+      final f = files[i] as Map;
+      final path = f['path'].toString();
+      final url = Uri.parse(f['url'].toString());
+      final out = File('$root/$path');
+      await out.parent.create(recursive: true);
+      final req = await client.getUrl(url);
+      final resp = await req.close();
+      final sink = out.openWrite();
+      await resp.forEach((chunk) {
+        sink.add(chunk);
+      });
+      await sink.close();
+      _status = 'Descarc fișiere ${i + 1}/${files.length}';
+      if (i % 3 == 0) window.scheduleFrame();
+    }
+  } finally {
+    client.close();
+  }
+}
+
 Future<void> _join() async {
   if (_joining) return;
   _joining = true;
+  _status = 'Verific fișierele jocului...';
+  window.scheduleFrame();
+  try {
+    final root = await _installRoot();
+    final files = await _manifest();
+    bool missing = false;
+    for (final e in files) {
+      final f = e as Map;
+      final file = File('$root/${f['path']}');
+      if (!await file.exists() || await file.length() != int.tryParse(f['size'].toString())) {
+        missing = true;
+        break;
+      }
+    }
+    if (missing) {
+      await _downloadFiles(files, root);
+    }
+  } catch (e) {
+    _status = 'Eroare download: $e';
+    window.scheduleFrame();
+    await Future.delayed(const Duration(seconds: 3));
+  }
+
   _status = 'Conectare la $_serverName...';
   window.scheduleFrame();
   final expiry = DateTime.now().add(const Duration(days: 1)).millisecondsSinceEpoch ~/ 1000;
