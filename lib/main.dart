@@ -963,6 +963,11 @@ final List<Rect> _igKeyRects = <Rect>[];
 final List<String> _igKeyLabels = <String>[];
 Rect _igDlgOK = Rect.zero, _igDlgCancel = Rect.zero, _igDlgClose = Rect.zero;
 Image? _igBg, _igSkin;
+// Dialoguri SA-MP primite de la motor in timpul jocului.
+int _igDlgId = 1;
+String _igDlgTitle = 'BLACK MOLDOW', _igDlgText = '';
+List<String> _igDlgButtons = <String>['Intră', 'Anulare'];
+bool _igDlgHasInput = true;
 Rect _igDlgLoginBtn = Rect.zero;
 
 typedef _MallocNative = ffi.Pointer<ffi.Void> Function(ffi.UintPtr);
@@ -996,6 +1001,31 @@ void _igInitNative() {
   } catch (_) {}
 }
 
+// Raspuns dialog SA-MP: buton, id dialog, text (ca in Android SendDialogResponse).
+void _igSendDialogResponse(int button, String input) {
+  try {
+    final bytes = utf8.encode(input);
+    final p = mallocTyped(bytes.length + 1);
+    for (int i = 0; i < bytes.length; i++) p[i] = bytes[i];
+    p[bytes.length] = 0;
+    for (final t in <int>[1, 62, 246, _igDlgId]) {
+      _igSubmit?.call(0, t, p.cast<ffi.Void>(), bytes.length);
+    }
+  } catch (_) {}
+  try {
+    window.sendPlatformMessage(
+        _igChan,
+        _call('message', <String, Object?>{
+          'dialogResponse': true,
+          'button': button,
+          'dialogId': _igDlgId,
+          'input': input,
+          'message': input,
+        }),
+        (_) {});
+  } catch (_) {}
+}
+
 void _igSendInput(String s) {
   if (s.isEmpty) return;
   try {
@@ -1003,11 +1033,15 @@ void _igSendInput(String s) {
     final p = mallocTyped(bytes.length + 1);
     for (int i = 0; i < bytes.length; i++) p[i] = bytes[i];
     p[bytes.length] = 0;
-    _igSubmit?.call(0, 0x10000, p.cast<ffi.Void>(), bytes.length);
+    // Tipuri de comanda incercate: 1 (dialog response), 246 (RPC auth login
+    // din clientul Android), 62 (RPC_DialogResponse SA-MP).
+    for (final t in <int>[1, 246, 62]) {
+      _igSubmit?.call(0, t, p.cast<ffi.Void>(), bytes.length);
+    }
   } catch (_) {}
   try {
     window.sendPlatformMessage(
-        _igChan, _call('message', <String, Object?>{'message': s}), (_) {});
+        _igChan, _call('message', <String, Object?>{'message': s, 'text': s}), (_) {});
   } catch (_) {}
   _igMessages.add('→ $s');
   if (_igMessages.length > 8) _igMessages.removeAt(0);
@@ -1094,6 +1128,30 @@ void _igMsg(String name, ByteData? data, void Function(ByteData?)? reply) {
     final method = r.value();
     if (method is! String) return;
     final args = r.value();
+    // Dialog SA-MP: titlu + text + butoane + camp de introducere.
+    if (args is Map) {
+      final cap = args['caption'] ?? args['title'] ?? args['header'];
+      final txt = args['text'] ?? args['message'] ?? args['info'];
+      final did = args['dialogId'] ?? args['dialog_id'] ?? args['id'];
+      final btn1 = args['button1'] ?? args['leftButton'];
+      final btn2 = args['button2'] ?? args['rightButton'];
+      if (cap is String || txt is String) {
+        if (cap is String) _igDlgTitle = cap;
+        if (txt is String) _igDlgText = txt;
+        if (did is int) _igDlgId = did;
+        _igDlgButtons = <String>[
+          if (btn1 is String && btn1.isNotEmpty) btn1 else 'OK',
+          if (btn2 is String && btn2.isNotEmpty) btn2 else 'Anulare',
+        ];
+        _igDlgHasInput = method.toLowerCase().contains('password') ||
+            txt.toString().toLowerCase().contains('parol');
+        _igInput = '';
+        _igDialogOpen = true;
+        window.scheduleFrame();
+        if (reply != null) reply(null);
+        return;
+      }
+    }
     if (method == 'resa_ui_remote_command' || method == 'message') {
       final s = args is Map ? args['text'] ?? args['message'] : null;
       if (s is String && s.isNotEmpty) {
@@ -1166,7 +1224,11 @@ void _igDrawDialog(Canvas c) {
 
   // Texte sus-stanga (muller_bold 20sp)
   _igText(c, 'Bine ai venit pe', dp(22), dp(22), dp(20), const Color(0xFFFFFFFF), 'MullerBd');
-  _igText(c, 'BLACK MOLDOW', dp(22), dp(48), dp(20), const Color(0xFFFF0000), 'MullerBd');
+  _igText(c, _igDlgTitle, dp(22), dp(48), dp(20), const Color(0xFFFF0000), 'MullerBd');
+  if (_igDlgText.isNotEmpty) {
+    _igText(c, _igDlgText, dp(22), dp(76), dp(11), const Color(0xFFE0E0E0), 'MontserratMd',
+        width: math.max(dp(200), _w / 2 - dp(40)));
+  }
 
   // Personaj stanga (170x241 dp, @drawable/auth_skin)
   final skin = Rect.fromLTWH(dp(12), _h - dp(241), dp(170), dp(241));
@@ -1225,11 +1287,11 @@ void _igDrawDialog(Canvas c) {
   // @drawable/auth_enter_btn + text "Intră" (muller_bold 17sp)
   final btn = Rect.fromLTWH(fx, f2.bottom + dp(30), fw, dp(50));
   _round(c, btn, dp(6), const Color(0xFFBA121C), stroke: const Color(0xFFFFFFFF), sw: dp(1.5));
-  _igText(c, 'Intră', btn.left, btn.top + dp(14), dp(17), const Color(0xFFFFFFFF), 'MullerBd',
-      align: TextAlign.center, width: btn.width);
+  _igText(c, _igDlgButtons.isNotEmpty ? _igDlgButtons[0] : 'Intră', btn.left, btn.top + dp(14),
+      dp(17), const Color(0xFFFFFFFF), 'MullerBd', align: TextAlign.center, width: btn.width);
   _igDlgOK = btn;
   _igDlgCancel = Rect.fromLTWH(fx, btn.bottom + dp(8), fw, dp(28));
-  _igPill(c, _igDlgCancel, 'ANULARE');
+  _igPill(c, _igDlgCancel, _igDlgButtons.length > 1 ? _igDlgButtons[1].toUpperCase() : 'ANULARE');
 
   // Tastatura QWERTY in partea de jos (folosita la introducerea parolei).
   _igKeyRects.clear();
@@ -1359,11 +1421,12 @@ void _igPointer(PointerDataPacket packet) {
         if (s.isNotEmpty) {
           _password = s;
           _savePassword(s);
-          _igSendInput(s);
         }
+        _igSendDialogResponse(1, s);
         _igDialogOpen = false;
         _igInput = '';
       } else if (_igDlgCancel.contains(p)) {
+        _igSendDialogResponse(0, '');
         _igDialogOpen = false;
         _igInput = '';
       } else {
@@ -1405,6 +1468,7 @@ void _igHandshake() {
 void ingameMain() {
   _igInitNative();
   _igLoadAssets();
+  _readNick(); // isolate separat: incarc nick_name + server_password din plist
   _igDialogOpen = true; // se deschide la conectarea pe server (ca pe Android)
   _igHandshake();
   window.onPlatformMessage = _igMsg;
