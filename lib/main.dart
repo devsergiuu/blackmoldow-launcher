@@ -262,7 +262,7 @@ void _iconBtn(Canvas c, Rect r, String icon,
   _img(c, icon, Rect.fromLTWH(r.left + pad, r.top + pad, r.width - pad * 2, r.height - pad * 2), tint: fg);
 }
 
-void _lobbyOld(Canvas c) {
+void _lobbyDp(Canvas c) {
   final m = dp(18);
 
   // mainPlayerBlock: 206x72, marginStart 18, marginTop 20
@@ -355,7 +355,7 @@ void _lobbyOld(Canvas c) {
       bold: false, align: TextAlign.center, width: _w);
 }
 
-void _lobby(Canvas c) {
+void _lobbyPercent(Canvas c) {
   final u = math.min(_w, _h);
   final pad = u * 0.02;
 
@@ -476,26 +476,28 @@ void _profile(Canvas c) {
 }
 
 void _paint(Canvas c) {
+  // Desenam direct in pixeli fizici: asa umple ecranul pe orice iPhone,
+  // indiferent de devicePixelRatio (nu depindem de scalarea canvas-ului).
   _dpr = window.devicePixelRatio;
-  _w = window.physicalSize.width / _dpr;
-  _h = window.physicalSize.height / _dpr;
-  // scala se bazeaza pe ambele dimensiuni ca sa nu se suprapuna in landscape
+  _w = window.physicalSize.width;
+  _h = window.physicalSize.height;
+  // _s converteste dp -> pixeli fizici (referinta 390x844 dp, ca activity_main.xml)
   _s = math.min(_w / 390.0, _h / 844.0);
   _background(c);
   if (_showProfile) {
     _profile(c);
     return;
   }
-  _lobby(c);
+  _lobbyDp(c);
   if (_status.isNotEmpty) {
-    _txt(c, _status, 0, _h * 0.80, dp(11), _cGold, align: TextAlign.center, width: _w);
+    _txt(c, _status, 0, _h * 0.52, dp(12), _cGold, align: TextAlign.center, width: _w);
   }
 }
 
 void _pointer(PointerDataPacket packet) {
   for (final d in packet.data) {
     if (d.change != PointerChange.down) continue;
-    final p = Offset(d.physicalX / _dpr, d.physicalY / _dpr);
+    final p = Offset(d.physicalX, d.physicalY);
     if (_showProfile) {
       if (_rBack.contains(p)) { _showProfile = false; window.scheduleFrame(); }
     } else if (_rPlay.contains(p)) {
@@ -673,7 +675,7 @@ void main() {
   window.onDrawFrame = () {
     _dpr = window.devicePixelRatio;
     final rec = PictureRecorder();
-    final canvas = Canvas(rec)..scale(_dpr);
+    final canvas = Canvas(rec);
     _paint(canvas);
     window.render((SceneBuilder()..addPicture(Offset.zero, rec.endRecording())).build());
     if (_bg == null) window.scheduleFrame();
