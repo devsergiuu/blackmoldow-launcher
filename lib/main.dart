@@ -176,47 +176,112 @@ Object? _parseBplist(List<int> b) {
   return _bplistObject(b, top, offsets, refSize);
 }
 
-Future<void> _readNick() async {
-  final home = Platform.environment['HOME'];
-  // Parola salvata (folosita la conectare si in dialogul de login).
+// Calea reala a plist-ului launcherului iOS: <container>/Library/Preferences/client_settings.plist.
+// HOME nu e setat in isolated-ul Dart, deci derivam containerul din Documents (installRoot).
+Future<String> _settingsPlistPath() async {
   try {
-    if (home != null) {
-      final pf = File('$home/Documents/password.txt');
-      if (await pf.exists()) _password = (await pf.readAsString()).trim();
-    }
-  } catch (_) {}
-  // Preferim fisierul scris de launcher (editabil in aplicatie).
-  final files = <String>[
-    if (home != null) '$home/Documents/nickname.txt',
-    '${Directory.current.path}/Documents/nickname.txt',
-  ];
-  for (final p in files) {
-    try {
-      final f = File(p);
-      if (!await f.exists()) continue;
-      final s = (await f.readAsString()).trim();
-      if (s.isNotEmpty) {
-        _nick = s;
-        return;
-      }
-    } catch (_) {}
+    final docs = await _installRoot();
+    final container = Directory(docs).parent.path;
+    return '$container/Library/Preferences/client_settings.plist';
+  } catch (_) {
+    final home = Platform.environment['HOME'];
+    return home != null ? '$home/Library/Preferences/client_settings.plist' : '';
   }
-  // Fallback: client_settings.plist (vechiul launcher).
+}
+
+Future<void> _readNick() async {
+  final p = await _settingsPlistPath();
+  if (p.isEmpty) return;
   try {
-    if (home == null) return;
-    final f = File('$home/Library/Preferences/client_settings.plist');
+    final f = File(p);
     if (!await f.exists()) return;
     final obj = _parseBplist(await f.readAsBytes());
-    if (obj is Map && obj['nick_name'] is String && (obj['nick_name'] as String).isNotEmpty) {
-      _nick = obj['nick_name'] as String;
-    }
+    if (obj is! Map) return;
+    final n = obj['nick_name'];
+    if (n is String && n.isNotEmpty) _nick = n;
+    final pw = obj['server_password'];
+    if (pw is String && pw.isNotEmpty) _password = pw;
   } catch (_) {}
 }
 
+// Scrie in acelasi plist folosit de launcherul original (XML plist, compatibil
+// cu PropertyListSerialization). Pastreaza toate cheile existente.
 Future<void> _saveNick(String s) async {
   try {
-    final root = await _installRoot();
-    await File('$root/nickname.txt').writeAsString(s);
+    final p = await _settingsPlistPath();
+    if (p.isEmpty) return;
+    final f = File(p);
+    Map<String, Object?> data = <String, Object?>{};
+    if (await f.exists()) {
+      final obj = _parseBplist(await f.readAsBytes());
+      if (obj is Map) data = Map<String, Object?>.from(obj);
+    }
+    data['nick_name'] = s;
+    final hist = <String>[s];
+    final old = data['nickname_history'];
+    if (old is String) {
+      for (final m in RegExp(r'"([^"]+)"').allMatches(old)) {
+        final v = m.group(1);
+        if (v != null && v.isNotEmpty && !hist.contains(v)) hist.add(v);
+      }
+    }
+    data['nickname_history'] = jsonEncode(hist);
+    final sb = StringBuffer('<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+        '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+        '<plist version="1.0"><dict>\n');
+    data.forEach((k, v) {
+      sb.write('<key>$k</key>');
+      if (v is String) {
+        final esc = v.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+        sb.write('<string>$esc</string>\n');
+      } else if (v is bool) {
+        sb.write(v ? '<true/>\n' : '<false/>\n');
+      } else if (v is int) {
+        sb.write('<integer>$v</integer>\n');
+      } else if (v is num) {
+        sb.write('<real>$v</real>\n');
+      } else {
+        sb.write('<string>${v.toString()}</string>\n');
+      }
+    });
+    sb.write('</dict></plist>\n');
+    await f.writeAsString(sb.toString());
+  } catch (_) {}
+}
+
+Future<void> _savePassword(String s) async {
+  try {
+    final p = await _settingsPlistPath();
+    if (p.isEmpty) return;
+    final f = File(p);
+    Map<String, Object?> data = <String, Object?>{};
+    if (await f.exists()) {
+      final obj = _parseBplist(await f.readAsBytes());
+      if (obj is Map) data = Map<String, Object?>.from(obj);
+    }
+    data['server_password'] = s;
+    final sb = StringBuffer('<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+        '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+        '<plist version="1.0"><dict>\n');
+    data.forEach((k, v) {
+      sb.write('<key>$k</key>');
+      if (v is String) {
+        final esc = v.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+        sb.write('<string>$esc</string>\n');
+      } else if (v is bool) {
+        sb.write(v ? '<true/>\n' : '<false/>\n');
+      } else if (v is int) {
+        sb.write('<integer>$v</integer>\n');
+      } else if (v is num) {
+        sb.write('<real>$v</real>\n');
+      } else {
+        sb.write('<string>${v.toString()}</string>\n');
+      }
+    });
+    sb.write('</dict></plist>\n');
+    await f.writeAsString(sb.toString());
   } catch (_) {}
 }
 
@@ -1291,7 +1356,11 @@ void _igPointer(PointerDataPacket packet) {
     if (_igDialogOpen) {
       if (_igDlgOK.contains(p)) {
         final s = _igInput.trim();
-        if (s.isNotEmpty) _igSendInput(s);
+        if (s.isNotEmpty) {
+          _password = s;
+          _savePassword(s);
+          _igSendInput(s);
+        }
         _igDialogOpen = false;
         _igInput = '';
       } else if (_igDlgCancel.contains(p)) {
