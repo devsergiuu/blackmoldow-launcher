@@ -13,6 +13,7 @@ const _ip = '51.75.44.14';
 const _port = 8889;
 const _serverName = 'BLACK MOLDOW';
 String _nick = 'Nume_Prenume';
+String _password = '';
 
 const _cGold = Color(0xFFFFC62E);
 const _cBg = Color(0xFF0B0B10);
@@ -176,6 +177,13 @@ Object? _parseBplist(List<int> b) {
 
 Future<void> _readNick() async {
   final home = Platform.environment['HOME'];
+  // Parola salvata (folosita la conectare si in dialogul de login).
+  try {
+    if (home != null) {
+      final pf = File('$home/Documents/password.txt');
+      if (await pf.exists()) _password = (await pf.readAsString()).trim();
+    }
+  } catch (_) {}
   // Preferim fisierul scris de launcher (editabil in aplicatie).
   final files = <String>[
     if (home != null) '$home/Documents/nickname.txt',
@@ -837,7 +845,7 @@ Future<void> _join() async {
       'nickname': _nick,
       'host': _ip,
       'port': _port,
-      'password': '',
+      'password': _password,
       'serverName': _serverName,
       'sessionToken': 'bm-local-${DateTime.now().millisecondsSinceEpoch}',
       'sessionExpiresAt': expiry,
@@ -871,14 +879,22 @@ Future<void> _join() async {
 
 const _igChan = 'ro.alynsampmobile.launcher/ingame_host';
 bool _igChatOpen = false, _igScoreOpen = false;
+bool _igDialogOpen = false, _igDkShift = false;
+int _igDkPage = 0, _igFrame = 0;
+String _igInput = '';
 final List<String> _igMessages = <String>[];
-int _igFrame = 0;
+final List<Rect> _igKeyRects = <Rect>[];
+final List<String> _igKeyLabels = <String>[];
+Rect _igDlgOK = Rect.zero, _igDlgCancel = Rect.zero, _igDlgClose = Rect.zero;
 
 typedef _MallocNative = ffi.Pointer<ffi.Void> Function(ffi.UintPtr);
 typedef _MallocDart = ffi.Pointer<ffi.Void> Function(int);
 typedef _ReadNative = ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Int32);
 typedef _ReadDart = int Function(ffi.Pointer<ffi.Void>, int);
+typedef _SubmitNative = ffi.Int32 Function(ffi.Uint32, ffi.Uint32, ffi.Pointer<ffi.Void>, ffi.Uint32);
+typedef _SubmitDart = int Function(int, int, ffi.Pointer<ffi.Void>, int);
 _ReadDart? _igReadMetrics;
+_SubmitDart? _igSubmit;
 ffi.Pointer<ffi.Void>? _igBuf;
 
 void _igInitNative() {
@@ -887,7 +903,31 @@ void _igInitNative() {
     final malloc = lib.lookupFunction<_MallocNative, _MallocDart>('malloc');
     _igBuf = malloc(72);
     _igReadMetrics = lib.lookupFunction<_ReadNative, _ReadDart>('resa_ui_read_metrics');
+    _igSubmit = lib.lookupFunction<_SubmitNative, _SubmitDart>('resa_ui_submit_command');
   } catch (_) {}
+}
+
+void _igSendInput(String s) {
+  if (s.isEmpty) return;
+  try {
+    final bytes = utf8.encode(s);
+    final p = mallocTyped(bytes.length + 1);
+    for (int i = 0; i < bytes.length; i++) p[i] = bytes[i];
+    p[bytes.length] = 0;
+    _igSubmit?.call(0, 0x10000, p.cast<ffi.Void>(), bytes.length);
+  } catch (_) {}
+  try {
+    window.sendPlatformMessage(
+        _igChan, _call('message', <String, Object?>{'message': s}), (_) {});
+  } catch (_) {}
+  _igMessages.add('→ $s');
+  if (_igMessages.length > 8) _igMessages.removeAt(0);
+}
+
+ffi.Pointer<ffi.Uint8> mallocTyped(int n) {
+  final lib = ffi.DynamicLibrary.process();
+  final m = lib.lookupFunction<_MallocNative, _MallocDart>('malloc');
+  return m(n).cast<ffi.Uint8>();
 }
 
 List<double> _igMetrics() {
@@ -983,6 +1023,78 @@ void _igBtn(Canvas c, Rect r, String label, {Color fill = const Color(0x66000000
       align: TextAlign.center, width: r.width);
 }
 
+void _igKey(String k) {
+  if (k == '⌫') {
+    if (_igInput.isNotEmpty) _igInput = _igInput.substring(0, _igInput.length - 1);
+  } else if (k == '␣') {
+    if (_igInput.length < 40) _igInput += ' ';
+  } else if (k == '⇧') {
+    _igDkShift = !_igDkShift;
+  } else if (k == '123') {
+    _igDkPage = 1;
+  } else if (k == 'ABC') {
+    _igDkPage = 0;
+  } else if (_igInput.length < 40) {
+    _igInput += _igDkShift ? k.toUpperCase() : k.toLowerCase();
+  }
+  window.scheduleFrame();
+}
+
+void _igDrawDialog(Canvas c) {
+  // Panou dialog (stil SA-MP): titlu, text, camp de introducere, OK / Cancel.
+  final w = math.min(_w * 0.6, dp(520));
+  final h = dp(300);
+  final box = Rect.fromLTWH((_w - w) / 2, (_h - h) / 2 - dp(20), w, h);
+  _round(c, box, dp(10), const Color(0xF2101218), stroke: const Color(0xFFE8A93B), sw: dp(2));
+  _txt(c, 'BLACK MOLDOW', box.left, box.top + dp(14), dp(16), _cGold,
+      align: TextAlign.center, width: box.width);
+  _txt(c, 'Introdu parola contului:', box.left, box.top + dp(46), dp(12), _cWhite,
+      align: TextAlign.center, width: box.width);
+
+  final field = Rect.fromLTWH(box.left + dp(24), box.top + dp(72), box.width - dp(48), dp(34));
+  _round(c, field, dp(6), const Color(0xFF050508), stroke: const Color(0x88FFC62E));
+  final masked = '*' * _igInput.length;
+  _txt(c, masked, field.left + dp(9), field.top + dp(7), dp(14), _cWhite, bold: false);
+
+  _igDlgOK = Rect.fromLTWH(box.left + box.width / 2 + dp(6), box.top + dp(112), dp(90), dp(30));
+  _igDlgCancel = Rect.fromLTWH(box.left + box.width / 2 - dp(96), box.top + dp(112), dp(90), dp(30));
+  _round(c, _igDlgOK, dp(6), const Color(0xFFFFC933));
+  _txt(c, 'OK', _igDlgOK.left, _igDlgOK.top + dp(7), dp(12), const Color(0xFF111318),
+      align: TextAlign.center, width: _igDlgOK.width);
+  _round(c, _igDlgCancel, dp(6), const Color(0x33FFFFFF), stroke: const Color(0x66FFFFFF));
+  _txt(c, 'ANULARE', _igDlgCancel.left, _igDlgCancel.top + dp(7), dp(11), _cWhite,
+      align: TextAlign.center, width: _igDlgCancel.width);
+
+  // TastaturaQWERTY in partea de jos a dialogului.
+  _igKeyRects.clear();
+  _igKeyLabels.clear();
+  final rows = _igDkPage == 0
+      ? [
+          ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+          ['⇧', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+          ['123', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '␣', '⌫'],
+        ]
+      : [
+          ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+          ['-', '@', '_', '.', ',', '!', '?', ':', '#', '/'],
+          ['ABC', '␣', '⌫'],
+        ];
+  final kw = dp(32), kh = dp(32), gap = dp(3);
+  final y0 = box.top + dp(152);
+  for (int r = 0; r < rows.length; r++) {
+    final row = rows[r];
+    final tw = row.length * kw + (row.length - 1) * gap;
+    final x0 = box.left + (box.width - tw) / 2;
+    for (int i = 0; i < row.length; i++) {
+      final kr = Rect.fromLTWH(x0 + i * (kw + gap), y0 + r * (kh + gap), kw, kh);
+      _round(c, kr, dp(4), const Color(0x3AFFFFFF), stroke: const Color(0x22FFFFFF));
+      _txt(c, row[i], kr.left, kr.top + dp(8), dp(11), _cWhite, align: TextAlign.center, width: kw);
+      _igKeyRects.add(kr);
+      _igKeyLabels.add(row[i]);
+    }
+  }
+}
+
 void _drawInGame(Canvas c) {
   _w = window.physicalSize.width;
   _h = window.physicalSize.height;
@@ -1050,6 +1162,8 @@ void _drawInGame(Canvas c) {
   _igBtn(c, Rect.fromLTWH(dp(160), br - dp(34), dp(44), dp(34)), 'CHAT');
   _igBtn(c, Rect.fromLTWH(dp(210), br - dp(34), dp(44), dp(34)), 'TAB');
   _igBtn(c, Rect.fromLTWH(dp(260), br - dp(34), dp(44), dp(34)), 'MAP');
+  _igBtn(c, Rect.fromLTWH(dp(310), br - dp(34), dp(52), dp(34)), 'LOGIN',
+      fill: const Color(0x66FFC933));
 
   // --- Panou chat ---
   if (_igChatOpen) {
@@ -1071,14 +1185,42 @@ void _drawInGame(Canvas c) {
     _txt(c, 'Jucători conectați', sr.left, sr.top + dp(38), dp(11), _cWhite,
         align: TextAlign.center, width: sr.width);
   }
+
+  // --- Dialog de login cu tastatura ---
+  if (_igDialogOpen) _igDrawDialog(c);
 }
 
 void _igPointer(PointerDataPacket packet) {
   for (final d in packet.data) {
     if (d.change != PointerChange.down) continue;
     final p = Offset(d.physicalX, d.physicalY);
+    if (_igDialogOpen) {
+      if (_igDlgOK.contains(p)) {
+        final s = _igInput.trim();
+        if (s.isNotEmpty) _igSendInput(s);
+        _igDialogOpen = false;
+        _igInput = '';
+      } else if (_igDlgCancel.contains(p)) {
+        _igDialogOpen = false;
+        _igInput = '';
+      } else {
+        for (int i = 0; i < _igKeyRects.length; i++) {
+          if (_igKeyRects[i].contains(p)) {
+            _igKey(_igKeyLabels[i]);
+            break;
+          }
+        }
+      }
+      window.scheduleFrame();
+      continue;
+    }
     final br = _h - dp(40);
-    if ((Offset(dp(182), br - dp(17)) - p).distance < dp(40)) {
+    if ((Offset(dp(336), br - dp(17)) - p).distance < dp(45)) {
+      _igDialogOpen = true;
+      _igInput = _password;
+      _igDkShift = false;
+      _igDkPage = 0;
+    } else if ((Offset(dp(182), br - dp(17)) - p).distance < dp(40)) {
       _igChatOpen = !_igChatOpen;
     } else if ((Offset(dp(232), br - dp(17)) - p).distance < dp(40)) {
       _igScoreOpen = !_igScoreOpen;
