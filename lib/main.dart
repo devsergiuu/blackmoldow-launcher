@@ -524,14 +524,36 @@ String? _replyString(ByteData? r) {
 }
 
 Future<String> _installRoot() async {
-  final r = await _send(_channelHost, _call('installRootURL', <String, Object?>{}));
-  String? s = _replyString(r);
-  if (s != null && s.isNotEmpty) {
-    if (s.startsWith('file://')) s = s.substring(7);
-    return s;
+  // 1) intreaba bridge-ul nativ (variant cu map si cu null)
+  for (final args in [<String, Object?>{}, null]) {
+    try {
+      final r = await _send(_channelHost, args == null
+          ? (_W()..value('installRootURL')..value(null)).done()
+          : _call('installRootURL', args));
+      String? s = _replyString(r);
+      if (s != null && s.isNotEmpty) {
+        if (s.startsWith('file://')) s = s.substring(7);
+        if (Uri.tryParse(s)?.hasScheme == true) s = Uri.parse(s).toFilePath();
+        return s;
+      }
+    } catch (_) {}
   }
-  final home = Platform.environment['HOME'];
-  return home == null ? 'Documents' : '$home/Documents';
+  // 2) HOME poate fi gol in sandboxul iOS; cauta radacina dupa fisierele deja descarcat
+  final cwd = Directory.current.path;
+  final candidates = <String>[
+    if (Platform.environment['HOME'] != null) '${Platform.environment['HOME']}/Documents',
+    '$cwd/Documents',
+    cwd,
+  ];
+  for (final c in candidates) {
+    if (File('$c/textures/game.bin').existsSync() || File('$c/SAMP/gta.dat').existsSync()) {
+      return c;
+    }
+  }
+  // 3) fallback: cream Documents langa directorul curent
+  final fallback = '$cwd/Documents';
+  Directory(fallback).createSync(recursive: true);
+  return fallback;
 }
 
 Future<List<Object?>> _manifest() async {
