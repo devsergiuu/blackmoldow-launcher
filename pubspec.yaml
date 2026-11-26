@@ -1,0 +1,34 @@
+name: blackmoldow_launcher
+description: Launcher iOS Black Moldow, layout dupa activity_main.xml.
+publish_to: none
+
+environment:
+  sdk: ">=3.13.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/bg/home_calm.webp
+    - assets/brand/resa_logo.png
+    - assets/brand/resa_emblem.png
+    - assets/android/cross_slot_plus.png
+    - assets/android/discord_logo.png
+    - assets/android/lobby_ic_back.png
+    - assets/android/lobby_ic_crown.png
+    - assets/android/lobby_ic_play.png
+    - assets/android/lobby_ic_plus.png
+    - assets/android/lobby_ic_profile.png
+    - assets/android/lobby_ic_settings.png
+    - assets/android/lobby_ic_swap.png
+    - assets/android/lobby_ic_telegram.png
+  fonts:
+    - family: HalvarBd
+      fonts:
+        - asset: assets/fonts/halvar_eng_bd.ttf
+    - family: HalvarMd
+      fonts:
+        - asset: assets/fonts/halvar_eng_md.ttf

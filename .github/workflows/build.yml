@@ -1,0 +1,50 @@
+name: Build Black Moldow iOS launcher
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter 3.47.2 (engine a804b261)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+
+      - name: Create iOS Runner and inject launcher source
+        run: |
+          flutter create --platforms ios --project-name blackmoldow_launcher app
+          cp pubspec.yaml app/pubspec.yaml
+          cp lib/main.dart app/lib/main.dart
+          mkdir -p app/assets
+          cp -R assets/* app/assets/
+          cd app
+          flutter pub get
+
+      - name: Build AOT App.framework for iOS arm64
+        run: |
+          cd app
+          flutter build ios --release --no-codesign
+
+      - name: Assemble final IPA with the original client
+        run: |
+          set -e
+          mkdir -p out
+          cd out
+          unzip -q ../base.ipa -d .
+          APP=Payload/ReSALauncher.app/Frameworks/App.framework
+          rm -rf "$APP"
+          cp -R ../app/build/ios/iphoneos/Runner.app/Frameworks/App.framework "$APP"
+          zip -qr ../blackmoldow-launcher.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: blackmoldow-launcher-ipa
+          path: blackmoldow-launcher.ipa
+          if-no-files-found: error
