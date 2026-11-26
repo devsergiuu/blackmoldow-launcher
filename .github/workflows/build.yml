@@ -38,8 +38,28 @@ jobs:
           cd out
           unzip -q ../base.ipa -d .
           APP=Payload/ReSALauncher.app/Frameworks/App.framework
+          mkdir -p oldflutter
+          cp -R "$APP/flutter_assets/." oldflutter/
           rm -rf "$APP"
           cp -R ../app/build/ios/iphoneos/Runner.app/Frameworks/App.framework "$APP"
+          cp -Rn oldflutter/. "$APP/flutter_assets/"
+          python3 - <<'PY'
+          import json, os
+          new = 'Payload/ReSALauncher.app/Frameworks/App.framework/flutter_assets/'
+          old = 'oldflutter/'
+          am = json.load(open(old + 'AssetManifest.json'))
+          am.update(json.load(open(new + 'AssetManifest.json')))
+          json.dump(am, open(new + 'AssetManifest.json', 'w'), ensure_ascii=False)
+          fm = json.load(open(old + 'FontManifest.json'))
+          families = {f.get('family') for f in fm}
+          for f in json.load(open(new + 'FontManifest.json')):
+              if f.get('family') not in families:
+                  fm.append(f)
+          json.dump(fm, open(new + 'FontManifest.json', 'w'), ensure_ascii=False)
+          json.dump(json.load(open(old + 'NativeAssetsManifest.json')),
+                    open(new + 'NativeAssetsManifest.json', 'w'), ensure_ascii=False)
+          print('merged manifests')
+          PY
           zip -qr ../blackmoldow-launcher.ipa Payload
 
       - name: Upload IPA
