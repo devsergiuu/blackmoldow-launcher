@@ -25,6 +25,10 @@ flutter:
     - assets/android/lobby_ic_settings.png
     - assets/android/lobby_ic_swap.png
     - assets/android/lobby_ic_telegram.png
+    - assets/auth/auth_bg.png
+    - assets/auth/auth_skin.png
+    - assets/auth/muller_bold.ttf
+    - assets/auth/montserrat_medium.ttf
   fonts:
     - family: HalvarBd
       fonts:
@@ -32,3 +36,9 @@ flutter:
     - family: HalvarMd
       fonts:
         - asset: assets/fonts/halvar_eng_md.ttf
+    - family: MullerBd
+      fonts:
+        - asset: assets/auth/muller_bold.ttf
+    - family: MontserratMd
+      fonts:
+        - asset: assets/auth/montserrat_medium.ttf
