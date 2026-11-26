@@ -27,9 +27,13 @@ class _W {
     for (int i = 0; i < 8; i++) _b.add([(v >> (8 * i)) & 0xFF]);
   }
 
+  void size(int n) {
+    if (n < 254) { u8(n); } else { u8(255); u32(n); }
+  }
+
   void string(String s) {
     final b = utf8.encode(s);
-    if (b.length < 254) u8(b.length); else { u8(255); u32(b.length); }
+    size(b.length);
     _b.add(b);
   }
 
@@ -40,12 +44,12 @@ class _W {
       if (v >= -0x80000000 && v <= 0x7FFFFFFF) { u8(3); u32(v); }
       else { u8(4); u64(v); }
     } else if (v is String) { u8(7); string(v); }
-    else if (v is Uint8List) { u8(8); u32(v.length); _b.add(v); }
+    else if (v is Uint8List) { u8(8); size(v.length); _b.add(v); }
     else if (v is Map) {
-      u8(12); u32(v.length);
+      u8(12); size(v.length);
       v.forEach((k, val) { value(k.toString()); value(val); });
     } else if (v is List) {
-      u8(13); u32(v.length);
+      u8(13); size(v.length);
       for (final e in v) { value(e); }
     } else { value(v.toString()); }
   }
@@ -376,9 +380,11 @@ void _profile(Canvas c) {
 }
 
 void _paint(Canvas c) {
+  _dpr = window.devicePixelRatio;
   _w = window.physicalSize.width / _dpr;
   _h = window.physicalSize.height / _dpr;
-  _s = _w / 390.0;
+  // scala se bazeaza pe ambele dimensiuni ca sa nu se suprapuna in landscape
+  _s = math.min(_w / 390.0, _h / 844.0);
   _background(c);
   if (_showProfile) {
     _profile(c);
