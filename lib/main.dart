@@ -512,9 +512,14 @@ String? _replyString(ByteData? r) {
   if (r == null || r.lengthInBytes < 3) return null;
   final b = Uint8List.sublistView(r);
   int i = 0;
-  if (b[i++] != 0 || b[i++] != 7) return null;
+  if (b[i++] != 0) return null; // nu e raspuns de succes
+  if (b[i++] != 7) return null; // nu e string
   int n = b[i++];
-  if (n == 255) {
+  if (n == 254) {
+    if (i + 2 > b.length) return null;
+    n = b[i] | (b[i + 1] << 8);
+    i += 2;
+  } else if (n == 255) {
     if (i + 4 > b.length) return null;
     n = b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24);
     i += 4;
@@ -524,25 +529,31 @@ String? _replyString(ByteData? r) {
 }
 
 Future<String> _installRoot() async {
-  // 1) intreaba bridge-ul nativ (variant cu map si cu null)
-  for (final args in [<String, Object?>{}, null]) {
+  // Doar metode care EXISTA in bridge-ul nativ: installRoot / externalFilesDir.
+  // (installRootURL nu exista -> bridge intoarce FlutterMethodNotImplemented,
+  //  codecul standard nu poate encoda NSObject-ul si aplicatia crapa.)
+  for (final m in ['installRoot', 'externalFilesDir']) {
     try {
-      final r = await _send(_channelHost, args == null
-          ? (_W()..value('installRootURL')..value(null)).done()
-          : _call('installRootURL', args));
-      String? s = _replyString(r);
+      final r = await _send(_channelHost, _call(m, <String, Object?>{}));
+      var s = _replyString(r);
       if (s != null && s.isNotEmpty) {
-        if (s.startsWith('file://')) s = s.substring(7);
-        if (Uri.tryParse(s)?.hasScheme == true) s = Uri.parse(s).toFilePath();
-        // refuza calea relativa gen "Documents" (intoarsa de bridge pe iOS)
-        if (s.startsWith('/')) return s;
+        if (s.startsWith('file://')) s = Uri.parse(s).toFilePath();
+        if (!s.startsWith('/')) {
+          final home = Platform.environment['HOME'];
+          if (home != null && home.startsWith('/')) s = '$home/$s';
+        }
+        if (s.startsWith('/')) {
+          Directory(s).createSync(recursive: true);
+          return s;
+        }
       }
     } catch (_) {}
   }
-  // 2) HOME poate fi gol in sandboxul iOS; cauta radacina dupa fisierele deja descarcat
+  // Fallback: containerul de date al aplicatiei.
+  final home = Platform.environment['HOME'];
   final cwd = Directory.current.path;
   final candidates = <String>[
-    if (Platform.environment['HOME'] != null) '${Platform.environment['HOME']}/Documents',
+    if (home != null && home.startsWith('/')) '$home/Documents',
     '$cwd/Documents',
     cwd,
   ];
@@ -551,17 +562,21 @@ Future<String> _installRoot() async {
       return c;
     }
   }
-  // 3) fallback: cream Documents langa directorul curent
-  final fallback = '$cwd/Documents';
+  final fallback = candidates.first;
   Directory(fallback).createSync(recursive: true);
   return fallback;
 }
 
+const _ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15';
+
 Future<List<Object?>> _manifest() async {
-  final client = HttpClient();
+  // fara User-Agent, resa-mp.com intoarce 403
+  final client = HttpClient()..userAgent = _ua;
   try {
     final req = await client.getUrl(Uri.parse('https://resa-mp.com/api/game-files'));
+    req.headers.set('Accept', 'application/json');
     final resp = await req.close();
+    if (resp.statusCode != 200) throw 'HTTP ${resp.statusCode} lista de fișiere';
     final body = await utf8.decoder.bind(resp).join();
     final data = jsonDecode(body);
     return (data['files'] as List).cast<Object?>();
@@ -571,18 +586,22 @@ Future<List<Object?>> _manifest() async {
 }
 
 Future<void> _downloadFiles(List<Object?> files, String root) async {
-  await _send(_channelHost, _call('beginDownloadBackgroundTask', <String, Object?>{}));
-  final client = HttpClient();
+  final client = HttpClient()..userAgent = _ua;
   try {
     for (int i = 0; i < files.length; i++) {
       final f = files[i] as Map;
       final path = f['path'].toString();
-      final url = Uri.parse(f['url'].toString());
+      final want = int.tryParse(f['size'].toString());
       final out = File('$root/$path');
+      if (want != null && await out.exists() && await out.length() == want) continue;
       await out.parent.create(recursive: true);
+      final url = Uri.parse(f['url'].toString());
       final part = File('$root/$path.part');
       final req = await client.getUrl(url);
       final resp = await req.close();
+      if (resp.statusCode != 200) {
+        throw 'HTTP ${resp.statusCode} pentru $path';
+      }
       final sink = part.openWrite();
       await resp.forEach((chunk) {
         sink.add(chunk);
@@ -591,7 +610,7 @@ Future<void> _downloadFiles(List<Object?> files, String root) async {
       if (await out.exists()) await out.delete();
       await part.rename(out.path);
       _status = 'Descarc fișiere ${i + 1}/${files.length}';
-      if (i % 3 == 0) window.scheduleFrame();
+      window.scheduleFrame();
     }
   } finally {
     client.close();
@@ -605,38 +624,45 @@ Future<void> _join() async {
   window.scheduleFrame();
   try {
     final root = await _installRoot();
+    _status = 'Descarc lista de fișiere...';
+    window.scheduleFrame();
     final files = await _manifest();
-    bool missing = false;
+    var missing = 0;
     for (final e in files) {
       final f = e as Map;
       final file = File('$root/${f['path']}');
-      if (!await file.exists() || await file.length() != int.tryParse(f['size'].toString())) {
-        missing = true;
-        break;
+      final want = int.tryParse(f['size'].toString());
+      if (!await file.exists() || (want != null && await file.length() != want)) {
+        missing++;
       }
     }
-    if (missing) {
+    if (missing > 0) {
       await _downloadFiles(files, root);
     }
   } catch (e) {
-    _status = 'Eroare download: $e';
+    _status = 'Eroare: $e';
+    _joining = false;
     window.scheduleFrame();
-    await Future.delayed(const Duration(seconds: 3));
+    return;
   }
 
   _status = 'Conectare la $_serverName...';
   window.scheduleFrame();
-  final expiry = DateTime.now().add(const Duration(days: 1)).millisecondsSinceEpoch ~/ 1000;
-  await _send(_channelHost, _call('startGame', <String, Object?>{
-    'host': _ip,
-    'port': _port,
-    'nickname': _nick,
-    'password': '',
-    'serverName': _serverName,
-    'sessionToken': 'bm-local-${DateTime.now().millisecondsSinceEpoch}',
-    'sessionExpiresAt': expiry,
-  }));
-  _status = '';
+  try {
+    final expiry = DateTime.now().add(const Duration(days: 1)).millisecondsSinceEpoch ~/ 1000;
+    await _send(_channelHost, _call('startGame', <String, Object?>{
+      'host': _ip,
+      'port': _port,
+      'nickname': _nick,
+      'password': '',
+      'serverName': _serverName,
+      'sessionToken': 'bm-local-${DateTime.now().millisecondsSinceEpoch}',
+      'sessionExpiresAt': expiry,
+    }));
+    _status = '';
+  } catch (e) {
+    _status = 'Eroare start: $e';
+  }
   _joining = false;
   window.scheduleFrame();
 }
