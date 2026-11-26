@@ -886,6 +886,8 @@ final List<String> _igMessages = <String>[];
 final List<Rect> _igKeyRects = <Rect>[];
 final List<String> _igKeyLabels = <String>[];
 Rect _igDlgOK = Rect.zero, _igDlgCancel = Rect.zero, _igDlgClose = Rect.zero;
+Offset _igStickBase = Offset.zero, _igKnob = Offset.zero;
+bool _igStickDown = false;
 
 typedef _MallocNative = ffi.Pointer<ffi.Void> Function(ffi.UintPtr);
 typedef _MallocDart = ffi.Pointer<ffi.Void> Function(int);
@@ -1023,6 +1025,24 @@ void _igBtn(Canvas c, Rect r, String label, {Color fill = const Color(0x66000000
       align: TextAlign.center, width: r.width);
 }
 
+void _igCircle(Canvas c, Offset center, double radius, String label,
+    {Color fill = const Color(0x55222226), Color ring = const Color(0xAAFFFFFF)}) {
+  c.drawCircle(center, radius, Paint()..color = fill);
+  c.drawCircle(center, radius, Paint()
+    ..color = ring..style = PaintingStyle.stroke..strokeWidth = dp(2));
+  c.drawCircle(center, radius * 0.78, Paint()
+    ..color = const Color(0x18FFFFFF)..style = PaintingStyle.stroke..strokeWidth = dp(0.7));
+  _txt(c, label, center.dx - radius, center.dy - dp(6), label.length > 3 ? dp(9) : dp(11),
+      _cWhite, align: TextAlign.center, width: radius * 2);
+}
+
+void _igPill(Canvas c, Rect r, String label, {bool gold = false}) {
+  _round(c, r, r.height / 2, gold ? const Color(0x55401200) : const Color(0x55222226),
+      stroke: gold ? const Color(0xEEFFC62E) : const Color(0x99FFFFFF), sw: dp(1.2));
+  _txt(c, label, r.left, r.top + r.height * 0.27, dp(9), gold ? _cGold : _cWhite,
+      align: TextAlign.center, width: r.width);
+}
+
 void _igKey(String k) {
   if (k == '⌫') {
     if (_igInput.isNotEmpty) _igInput = _igInput.substring(0, _igInput.length - 1);
@@ -1142,28 +1162,38 @@ void _drawInGame(Canvas c) {
         k < 0 ? _cGold : const Color(0x55FFFFFF), align: TextAlign.center, width: dp(14));
   }
 
-  // --- Controale touch: stick stanga jos ---
-  final stickC = Offset(dp(80), _h - dp(78));
-  c.drawCircle(stickC, dp(46), Paint()..color = const Color(0x33000000));
-  c.drawCircle(stickC, dp(46), Paint()
-    ..color = const Color(0x77FFFFFF)..style = PaintingStyle.stroke..strokeWidth = dp(2));
-  c.drawCircle(stickC + const Offset(0, 0), dp(19), Paint()..color = const Color(0x88FFFFFF));
+  // --- Controale touch stil GTA SA Mobile ---
+  // Stick stanga: baza translucida + inel alb + knob care urmareste degetul.
+  final stickC = Offset(dp(86), _h - dp(92));
+  _igStickBase = stickC;
+  c.drawCircle(stickC, dp(54), Paint()..color = const Color(0x2A000000));
+  c.drawCircle(stickC, dp(54), Paint()
+    ..color = const Color(0x8CFFFFFF)..style = PaintingStyle.stroke..strokeWidth = dp(2));
+  c.drawCircle(stickC, dp(42), Paint()..color = const Color(0x18FFFFFF));
+  final knob = stickC + _igKnob;
+  c.drawCircle(knob, dp(21), Paint()..color = const Color(0x99222226));
+  c.drawCircle(knob, dp(21), Paint()
+    ..color = const Color(0xCCFFFFFF)..style = PaintingStyle.stroke..strokeWidth = dp(2));
+  c.drawCircle(knob, dp(7), Paint()..color = const Color(0x88FFFFFF));
 
-  // --- Butoane actiune dreapta jos ---
+  // Cluster de actiune dreapta: butoane rotunde, GTA-style.
   final br = _h - dp(40);
-  _igBtn(c, Rect.fromLTWH(_w - dp(92), br - dp(92), dp(64), dp(64)), 'FIRE',
-      fill: const Color(0x66B82626));
-  _igBtn(c, Rect.fromLTWH(_w - dp(168), br - dp(70), dp(52), dp(52)), 'AIM');
-  _igBtn(c, Rect.fromLTWH(_w - dp(160), br - dp(140), dp(46), dp(46)), 'RUN');
-  _igBtn(c, Rect.fromLTWH(_w - dp(232), br - dp(118), dp(46), dp(46)), 'JUMP');
-  _igBtn(c, Rect.fromLTWH(_w - dp(38), br - dp(160), dp(34), dp(34)), '↑');
+  _igCircle(c, Offset(_w - dp(70), br - dp(58)), dp(40), 'FIRE',
+      fill: const Color(0x66B01E1E), ring: const Color(0xDFFFFFFF));
+  _igCircle(c, Offset(_w - dp(146), br - dp(40)), dp(27), 'AIM',
+      fill: const Color(0x55222226), ring: const Color(0xAAFFFFFF));
+  _igCircle(c, Offset(_w - dp(150), br - dp(116)), dp(27), 'RUN',
+      fill: const Color(0x55222226), ring: const Color(0xAAFFFFFF));
+  _igCircle(c, Offset(_w - dp(226), br - dp(82)), dp(27), 'JUMP',
+      fill: const Color(0x55222226), ring: const Color(0xAAFFFFFF));
+  _igCircle(c, Offset(_w - dp(40), br - dp(146)), dp(23), 'E',
+      fill: const Color(0x55222226), ring: const Color(0xAAFFFFFF));
 
-  // --- Butoane chat / score / harta ---
-  _igBtn(c, Rect.fromLTWH(dp(160), br - dp(34), dp(44), dp(34)), 'CHAT');
-  _igBtn(c, Rect.fromLTWH(dp(210), br - dp(34), dp(44), dp(34)), 'TAB');
-  _igBtn(c, Rect.fromLTWH(dp(260), br - dp(34), dp(44), dp(34)), 'MAP');
-  _igBtn(c, Rect.fromLTWH(dp(310), br - dp(34), dp(52), dp(34)), 'LOGIN',
-      fill: const Color(0x66FFC933));
+  // Butoane mici jos-centru: chat / tab / harta / login.
+  _igPill(c, Rect.fromLTWH(dp(158), br - dp(26), dp(42), dp(26)), 'CHAT');
+  _igPill(c, Rect.fromLTWH(dp(205), br - dp(26), dp(38), dp(26)), 'TAB');
+  _igPill(c, Rect.fromLTWH(dp(248), br - dp(26), dp(38), dp(26)), 'MAP');
+  _igPill(c, Rect.fromLTWH(dp(292), br - dp(26), dp(48), dp(26)), 'LOGIN', gold: true);
 
   // --- Panou chat ---
   if (_igChatOpen) {
@@ -1192,8 +1222,32 @@ void _drawInGame(Canvas c) {
 
 void _igPointer(PointerDataPacket packet) {
   for (final d in packet.data) {
-    if (d.change != PointerChange.down) continue;
     final p = Offset(d.physicalX, d.physicalY);
+    // Stick-ul urmareste degetul.
+    if (_igStickDown &&
+        (d.change == PointerChange.move ||
+            d.change == PointerChange.down ||
+            d.change == PointerChange.up)) {
+      final delta = p - _igStickBase;
+      final len = delta.distance;
+      _igKnob = len > dp(42) ? delta * (dp(42) / len) : delta;
+      if (d.change == PointerChange.up) {
+        _igStickDown = false;
+        _igKnob = Offset.zero;
+      }
+      window.scheduleFrame();
+    }
+    if (d.change == PointerChange.down &&
+        !_igDialogOpen &&
+        (p - _igStickBase).distance < dp(58)) {
+      _igStickDown = true;
+      final delta = p - _igStickBase;
+      final len = delta.distance;
+      _igKnob = len > dp(42) ? delta * (dp(42) / len) : delta;
+      window.scheduleFrame();
+      continue;
+    }
+    if (d.change != PointerChange.down) continue;
     if (_igDialogOpen) {
       if (_igDlgOK.contains(p)) {
         final s = _igInput.trim();
@@ -1215,14 +1269,14 @@ void _igPointer(PointerDataPacket packet) {
       continue;
     }
     final br = _h - dp(40);
-    if ((Offset(dp(336), br - dp(17)) - p).distance < dp(45)) {
+    if ((Offset(dp(316), br - dp(13)) - p).distance < dp(42)) {
       _igDialogOpen = true;
       _igInput = _password;
       _igDkShift = false;
       _igDkPage = 0;
-    } else if ((Offset(dp(182), br - dp(17)) - p).distance < dp(40)) {
+    } else if ((Offset(dp(179), br - dp(13)) - p).distance < dp(36)) {
       _igChatOpen = !_igChatOpen;
-    } else if ((Offset(dp(232), br - dp(17)) - p).distance < dp(40)) {
+    } else if ((Offset(dp(224), br - dp(13)) - p).distance < dp(36)) {
       _igScoreOpen = !_igScoreOpen;
     }
     window.scheduleFrame();
