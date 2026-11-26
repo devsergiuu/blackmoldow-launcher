@@ -482,8 +482,6 @@ void _paint(Canvas c) {
   // scala se bazeaza pe ambele dimensiuni ca sa nu se suprapuna in landscape
   _s = math.min(_w / 390.0, _h / 844.0);
   _background(c);
-  _txt(c, 'DBG PS=${window.physicalSize.width.toInt()}x${window.physicalSize.height.toInt()} dpr=${window.devicePixelRatio} W=${_w.toInt()} H=${_h.toInt()}',
-      0, 0, (_h / 60).clamp(8.0, 14.0), const Color(0xFFFFFFFF), bold: false, align: TextAlign.center, width: _w);
   if (_showProfile) {
     _profile(c);
     return;
@@ -621,8 +619,9 @@ void main() {
   _dpr = window.devicePixelRatio;
   window.onPointerDataPacket = _pointer;
   window.onDrawFrame = () {
+    _dpr = window.devicePixelRatio;
     final rec = PictureRecorder();
-    final canvas = Canvas(rec);
+    final canvas = Canvas(rec)..scale(_dpr);
     _paint(canvas);
     window.render((SceneBuilder()..addPicture(Offset.zero, rec.endRecording())).build());
     if (_bg == null) window.scheduleFrame();
