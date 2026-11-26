@@ -863,6 +863,24 @@ Future<void> _join() async {
   window.scheduleFrame();
 }
 
+// Al doilea entrypoint Dart, folosit de motorul in-joc (SAInGameOverlay).
+// Vechiul App il continea; launcherul nostru trebuie sa il furnizeze ca
+// jocul sa porneasca. Desenam o suprafata transparenta peste fereastra SDL
+// (native seteaza setOpaque:NO / backgroundColor nil), astfel incat lumea 3D
+// sa ramana vizibila, iar callback-ul de prim frame sa fie declansat.
+@pragma('vm:entry-point')
+void ingameMain() {
+  window.onDrawFrame = () {
+    final rec = PictureRecorder();
+    final c = Canvas(rec);
+    c.drawRect(Offset.zero & window.physicalSize,
+        Paint()..color = const Color(0x00000000));
+    window.render((SceneBuilder()..addPicture(Offset.zero, rec.endRecording())).build());
+    window.scheduleFrame();
+  };
+  window.scheduleFrame();
+}
+
 void main() {
   _dpr = window.devicePixelRatio;
   window.onPointerDataPacket = _pointer;
