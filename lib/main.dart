@@ -28,7 +28,15 @@ class _W {
   }
 
   void size(int n) {
-    if (n < 254) { u8(n); } else { u8(255); u32(n); }
+    if (n < 254) {
+      u8(n);
+    } else if (n <= 0xFFFF) {
+      u8(254);
+      _b.add([n & 0xFF, (n >> 8) & 0xFF]);
+    } else {
+      u8(255);
+      u32(n);
+    }
   }
 
   void string(String s) {
@@ -46,10 +54,10 @@ class _W {
     } else if (v is String) { u8(7); string(v); }
     else if (v is Uint8List) { u8(8); size(v.length); _b.add(v); }
     else if (v is Map) {
-      u8(12); size(v.length);
+      u8(13); size(v.length);
       v.forEach((k, val) { value(k.toString()); value(val); });
     } else if (v is List) {
-      u8(13); size(v.length);
+      u8(12); size(v.length);
       for (final e in v) { value(e); }
     } else { value(v.toString()); }
   }
@@ -58,7 +66,7 @@ class _W {
 }
 
 ByteData _call(String method, Map<String, Object?> args) =>
-    (_W()..u8(0)..value(method)..value(args)).done();
+    (_W()..value(method)..value(args)).done();
 
 Future<ByteData?> _send(String channel, ByteData data) {
   final c = Completer<ByteData?>();
@@ -474,6 +482,8 @@ void _paint(Canvas c) {
   // scala se bazeaza pe ambele dimensiuni ca sa nu se suprapuna in landscape
   _s = math.min(_w / 390.0, _h / 844.0);
   _background(c);
+  _txt(c, 'DBG PS=${window.physicalSize.width.toInt()}x${window.physicalSize.height.toInt()} dpr=${window.devicePixelRatio} W=${_w.toInt()} H=${_h.toInt()}',
+      0, 0, (_h / 60).clamp(8.0, 14.0), const Color(0xFFFFFFFF), bold: false, align: TextAlign.center, width: _w);
   if (_showProfile) {
     _profile(c);
     return;
