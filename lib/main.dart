@@ -105,6 +105,7 @@ String _status = '';
 String _nickDraft = '';
 Rect _rPlay = Rect.zero, _rProfile = Rect.zero, _rSettings = Rect.zero, _rBack = Rect.zero;
 Rect _rNickEdit = Rect.zero, _rNickBtn = Rect.zero, _rNickOK = Rect.zero, _rNickCancel = Rect.zero, _rKbToggle = Rect.zero;
+Rect _rLobbyNick = Rect.zero;
 final List<Rect> _keyRects = <Rect>[];
 final List<String> _keyLabels = <String>[];
 
@@ -307,7 +308,10 @@ void _lobbyDp(Canvas c) {
   // mainPlayerBlock: 206x72, marginStart 18, marginTop 20
   final px = m, py = dp(20);
   _txt(c, 'NIVEL 0', px, py, dp(17), _cWhite);
+  _rLobbyNick = Rect.fromLTWH(px - dp(4), py + dp(22), dp(200), dp(32));
+  _round(c, _rLobbyNick, dp(6), const Color(0x22FFFFFF), stroke: const Color(0x66FFC62E));
   _txt(c, _nick, px, py + dp(26), dp(21), _cWhite);
+  _txt(c, '✎', _rLobbyNick.right - dp(22), py + dp(28), dp(15), _cGold);
   final bs = dp(30);
   _rSettings = Rect.fromLTWH(px + dp(206) - bs, py, bs, bs);
   _rProfile = Rect.fromLTWH(_rSettings.left, py + dp(40), bs, bs);
@@ -663,6 +667,13 @@ void _pointer(PointerDataPacket packet) {
         _editNick = true;
         window.scheduleFrame();
       }
+    } else if (_rLobbyNick.contains(p)) {
+      // Tap pe nume -> editor; la salvare se scrie nickname.txt si se foloseste la startGame.
+      _nickDraft = _nick;
+      _kbShift = false;
+      _kbPage = 0;
+      _editNick = true;
+      window.scheduleFrame();
     } else if (_rPlay.contains(p)) {
       _join();
     } else if (_rProfile.contains(p) || _rSettings.contains(p)) {
