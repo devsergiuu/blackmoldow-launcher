@@ -978,11 +978,14 @@ typedef _SubmitNative = ffi.Int32 Function(ffi.Uint32, ffi.Uint32, ffi.Pointer<f
 typedef _SubmitDart = int Function(int, int, ffi.Pointer<ffi.Void>, int);
 typedef _ConnectNative = ffi.Pointer<ffi.Void> Function(ffi.Uint32, ffi.Pointer<ffi.Void>);
 typedef _ConnectDart = ffi.Pointer<ffi.Void> Function(int, ffi.Pointer<ffi.Void>);
+typedef _AcquireNative = ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>);
+typedef _AcquireDart = ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>);
 typedef _IsAttachedNative = ffi.Int32 Function();
 typedef _IsAttachedDart = int Function();
 _ReadDart? _igReadMetrics;
 _SubmitDart? _igSubmit;
 _ConnectDart? _igConnect;
+_AcquireDart? _igAcquire;
 _IsAttachedDart? _igIsAttached;
 ffi.Pointer<ffi.Void>? _igBuf, _igHandle;
 int _igAttached = -1;
@@ -1005,8 +1008,60 @@ void _igInitNative() {
     _igBuf = malloc(72);
     _igReadMetrics = lib.lookupFunction<_ReadNative, _ReadDart>('resa_ui_read_metrics');
     _igSubmit = lib.lookupFunction<_SubmitNative, _SubmitDart>('resa_ui_submit_command');
-    // ATENTIE: nu chem resa_ui_connect cu un context fabricat -> crash in engine.
-    // Vechiul UI primea contextul real de la nativ; aici il lasam pe cel existent.
+    _igAcquire = lib.lookupFunction<_AcquireNative, _AcquireDart>('resa_ui_acquire_batch');
+    // Citim handle-ul REAL din memoria engine-ului, fara sa chem connect
+    // (connect cu context fabricat = crash). Simbolul resa_ui_abi_version e la
+    // ofsetul 0xa70998, iar handle-ul global la 0x1f4e2a0 in alyn_resa.
+    final sym = lib.lookup('resa_ui_abi_version');
+    final base = sym.address - 0xa70998;
+    final hp = ffi.Pointer<ffi.Pointer<ffi.Void>>.fromAddress(base + 0x1f4e2a0);
+    _igHandle = hp.value;
+    _igAttached = _igHandle != null ? 1 : 0;
+  } catch (_) {}
+}
+
+// Citeste evenimentele din batch-ul UI al engine-ului (dialoguri etc.).
+void _igPollBatch() {
+  try {
+    if (_igAcquire == null || _igHandle == null) return;
+    final batch = _igAcquire!(_igHandle!);
+    if (batch == ffi.Pointer<ffi.Void>.fromAddress(0)) return;
+    final w = batch.cast<ffi.Uint64>();
+    final start = ffi.Pointer<ffi.Uint8>.fromAddress(w[5]); // +0x28
+    final end = w[7]; // +0x38
+    final count = (end - w[5]) ~/ 0x30;
+    if (count <= 0 || count > 64) return;
+    for (int k = 0; k < count; k++) {
+      final rec = ffi.Pointer<ffi.Uint8>.fromAddress(w[5] + k * 0x30);
+      final raw = rec.asTypedList(0x30);
+      // Cauta siruri ASCII in inregistrare.
+      final strs = <String>[];
+      final buf = StringBuffer();
+      for (final c in raw) {
+        if (c >= 32 && c < 127) {
+          buf.writeCharCode(c);
+        } else {
+          if (buf.length >= 4) strs.add(buf.toString());
+          buf.clear();
+        }
+      }
+      if (buf.length >= 4) strs.add(buf.toString());
+      if (strs.isEmpty) continue;
+      // Un dialog are de obicei id mic (1 = DIALOG_LOGIN) si text.
+      final id = rec.cast<ffi.Uint32>().value;
+      if (id == 0 || id > 100000) continue;
+      _igDlgId = id;
+      _igDlgTitle = strs.length > 1 ? strs[1] : 'BLACK MOLDOW';
+      _igDlgText = strs.length > 2 ? strs[2] : strs[0];
+      _igDlgButtons = <String>[
+        if (strs.length > 3) strs[3] else 'OK',
+        if (strs.length > 4) strs[4] else 'Anulare',
+      ];
+      _igInput = '';
+      _igDialogOpen = true;
+      window.scheduleFrame();
+      return;
+    }
   } catch (_) {}
 }
 
@@ -1487,6 +1542,7 @@ void ingameMain() {
   window.onPointerDataPacket = _igPointer;
   window.onDrawFrame = () {
     _igFrame++;
+    if (_igFrame % 10 == 0 && !_igDialogOpen) _igPollBatch();
     final rec = PictureRecorder();
     final c = Canvas(rec);
     // Fundal transparent: lumea 3D a jocului ramane vizibila.
