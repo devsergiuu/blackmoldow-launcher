@@ -2,6 +2,7 @@
 // cu drawable-urile reale din proiectul Android. Inlocuieste App.framework/App.
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi' as ffi;
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -863,18 +864,240 @@ Future<void> _join() async {
   window.scheduleFrame();
 }
 
-// Al doilea entrypoint Dart, folosit de motorul in-joc (SAInGameOverlay).
-// Vechiul App il continea; launcherul nostru trebuie sa il furnizeze ca
-// jocul sa porneasca. Desenam o suprafata transparenta peste fereastra SDL
-// (native seteaza setOpaque:NO / backgroundColor nil), astfel incat lumea 3D
-// sa ramana vizibila, iar callback-ul de prim frame sa fie declansat.
+// ===================== UI in-joc (entrypoint ingameMain) =====================
+// Vechiul App continea acest entrypoint cu tot HUD-ul si controalele touch.
+// Il reconstruim aici. Suprafata e transparenta (native seteaza
+// setOpaque:NO / backgroundColor nil), deci lumea 3D ramane vizibila.
+
+const _igChan = 'ro.alynsampmobile.launcher/ingame_host';
+bool _igChatOpen = false, _igScoreOpen = false;
+final List<String> _igMessages = <String>[];
+int _igFrame = 0;
+
+typedef _MallocNative = ffi.Pointer<ffi.Void> Function(ffi.UintPtr);
+typedef _MallocDart = ffi.Pointer<ffi.Void> Function(int);
+typedef _ReadNative = ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Int32);
+typedef _ReadDart = int Function(ffi.Pointer<ffi.Void>, int);
+_ReadDart? _igReadMetrics;
+ffi.Pointer<ffi.Void>? _igBuf;
+
+void _igInitNative() {
+  try {
+    final lib = ffi.DynamicLibrary.process();
+    final malloc = lib.lookupFunction<_MallocNative, _MallocDart>('malloc');
+    _igBuf = malloc(72);
+    _igReadMetrics = lib.lookupFunction<_ReadNative, _ReadDart>('resa_ui_read_metrics');
+  } catch (_) {}
+}
+
+List<double> _igMetrics() {
+  try {
+    if (_igReadMetrics == null || _igBuf == null) return const <double>[];
+    _igReadMetrics!(_igBuf!, 72);
+    return _igBuf!.cast<ffi.Float>().asTypedList(18).toList();
+  } catch (_) {
+    return const <double>[];
+  }
+}
+
+// Decodor StandardMethodCodec pentru mesajele native -> Dart.
+class _R {
+  final Uint8List b;
+  int i = 0;
+  _R(this.b);
+  int u8() => i < b.length ? b[i++] : 0;
+  int size() {
+    final n = u8();
+    if (n == 254) {
+      if (i + 2 > b.length) return 0;
+      final v = b[i] | (b[i + 1] << 8);
+      i += 2;
+      return v;
+    }
+    if (n == 255) {
+      if (i + 4 > b.length) return 0;
+      final v = b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24);
+      i += 4;
+      return v;
+    }
+    return n;
+  }
+
+  Object? value() {
+    final t = u8();
+    if (t == 0) return null;
+    if (t == 1) return true;
+    if (t == 2) return false;
+    if (t == 3 || t == 4) {
+      final n = t == 3 ? 4 : 8;
+      int v = 0;
+      for (int k = 0; k < n; k++) v |= u8() << (8 * k);
+      return v;
+    }
+    if (t == 7) {
+      final n = size();
+      if (i + n > b.length) return '';
+      final s = utf8.decode(b.sublist(i, i + n), allowMalformed: true);
+      i += n;
+      return s;
+    }
+    if (t == 12) {
+      final n = size();
+      return List<Object?>.generate(n, (_) => value());
+    }
+    if (t == 13) {
+      final n = size();
+      final m = <String, Object?>{};
+      for (int k = 0; k < n; k++) {
+        final key = value();
+        m[key.toString()] = value();
+      }
+      return m;
+    }
+    return null;
+  }
+}
+
+void _igMsg(String name, ByteData? data, void Function(ByteData?)? reply) {
+  if (data == null) return;
+  try {
+    final r = _R(Uint8List.sublistView(data));
+    final method = r.value();
+    if (method is! String) return;
+    final args = r.value();
+    if (method == 'resa_ui_remote_command' || method == 'message') {
+      final s = args is Map ? args['text'] ?? args['message'] : null;
+      if (s is String && s.isNotEmpty) {
+        _igMessages.add(s);
+        if (_igMessages.length > 8) _igMessages.removeAt(0);
+        window.scheduleFrame();
+      }
+    }
+  } catch (_) {}
+  if (reply != null) reply(null);
+}
+
+void _igBtn(Canvas c, Rect r, String label, {Color fill = const Color(0x66000000)}) {
+  _round(c, r, r.width / 2, fill, stroke: const Color(0x99FFFFFF), sw: dp(1.5));
+  _txt(c, label, r.left, r.top + r.height * 0.28, dp(13), _cWhite,
+      align: TextAlign.center, width: r.width);
+}
+
+void _drawInGame(Canvas c) {
+  _w = window.physicalSize.width;
+  _h = window.physicalSize.height;
+  // Referinta landscape 844x390 (jocul ruleaza landscape).
+  _s = math.min(_w / 844.0, _h / 390.0);
+
+  final vals = _igMetrics();
+  double health = vals.isNotEmpty ? vals[0] : 100;
+  double armour = vals.length > 1 ? vals[1] : 0;
+  if (health.isNaN || health < 0 || health > 200) health = 100;
+  if (armour.isNaN || armour < 0 || armour > 200) armour = 0;
+
+  // --- HUD stanga sus: sanatate / armura / bani ---
+  final barW = dp(150), barH = dp(9);
+  final bx = dp(14), by = dp(14);
+  _txt(c, 'HP', bx, by - dp(1), dp(9), const Color(0xFFE0E0E0), bold: false);
+  _round(c, Rect.fromLTWH(bx + dp(24), by, barW, barH), dp(4), const Color(0xAA101014));
+  _round(c, Rect.fromLTWH(bx + dp(24), by, barW * (health / 100).clamp(0.0, 1.0), barH),
+      dp(4), const Color(0xFF35C75A));
+  _txt(c, 'AR', bx, by + dp(14), dp(9), const Color(0xFFE0E0E0), bold: false);
+  _round(c, Rect.fromLTWH(bx + dp(24), by + dp(15), barW, barH), dp(4), const Color(0xAA101014));
+  _round(c, Rect.fromLTWH(bx + dp(24), by + dp(15), barW * (armour / 100).clamp(0.0, 1.0), barH),
+      dp(4), const Color(0xFF4A8FE7));
+
+  // --- Radar dreapta sus ---
+  final rr = dp(46);
+  final radar = Rect.fromLTWH(_w - dp(14) - rr * 2, dp(10), rr * 2, rr * 2);
+  c.drawCircle(radar.center, rr, Paint()..color = const Color(0x660A0A10));
+  c.drawCircle(radar.center, rr, Paint()
+    ..color = const Color(0xAAFFFFFF)..style = PaintingStyle.stroke..strokeWidth = dp(1.5));
+  c.drawLine(Offset(radar.center.dx - rr, radar.center.dy),
+      Offset(radar.center.dx + rr, radar.center.dy),
+      Paint()..color = const Color(0x44FFFFFF)..strokeWidth = dp(1));
+  for (int k = 0; k < 5; k++) {
+    final ang = (k * 1.257 + (_igFrame / 240)) % (math.pi * 2);
+    c.drawCircle(
+        radar.center + Offset(math.cos(ang) * rr * 0.62, math.sin(ang) * rr * 0.62),
+        dp(2.5), Paint()..color = k == 0 ? _cGold : const Color(0xFFE05353));
+  }
+
+  // --- Stele wanted ---
+  for (int k = 0; k < 6; k++) {
+    final x = _w / 2 - dp(45) + k * dp(16);
+    _txt(c, '★', x, dp(12), dp(12),
+        k < 0 ? _cGold : const Color(0x55FFFFFF), align: TextAlign.center, width: dp(14));
+  }
+
+  // --- Controale touch: stick stanga jos ---
+  final stickC = Offset(dp(80), _h - dp(78));
+  c.drawCircle(stickC, dp(46), Paint()..color = const Color(0x33000000));
+  c.drawCircle(stickC, dp(46), Paint()
+    ..color = const Color(0x77FFFFFF)..style = PaintingStyle.stroke..strokeWidth = dp(2));
+  c.drawCircle(stickC + const Offset(0, 0), dp(19), Paint()..color = const Color(0x88FFFFFF));
+
+  // --- Butoane actiune dreapta jos ---
+  final br = _h - dp(40);
+  _igBtn(c, Rect.fromLTWH(_w - dp(92), br - dp(92), dp(64), dp(64)), 'FIRE',
+      fill: const Color(0x66B82626));
+  _igBtn(c, Rect.fromLTWH(_w - dp(168), br - dp(70), dp(52), dp(52)), 'AIM');
+  _igBtn(c, Rect.fromLTWH(_w - dp(160), br - dp(140), dp(46), dp(46)), 'RUN');
+  _igBtn(c, Rect.fromLTWH(_w - dp(232), br - dp(118), dp(46), dp(46)), 'JUMP');
+  _igBtn(c, Rect.fromLTWH(_w - dp(38), br - dp(160), dp(34), dp(34)), '↑');
+
+  // --- Butoane chat / score / harta ---
+  _igBtn(c, Rect.fromLTWH(dp(160), br - dp(34), dp(44), dp(34)), 'CHAT');
+  _igBtn(c, Rect.fromLTWH(dp(210), br - dp(34), dp(44), dp(34)), 'TAB');
+  _igBtn(c, Rect.fromLTWH(dp(260), br - dp(34), dp(44), dp(34)), 'MAP');
+
+  // --- Panou chat ---
+  if (_igChatOpen) {
+    final cr = Rect.fromLTWH(dp(14), _h * 0.42, dp(330), dp(150));
+    _round(c, cr, dp(8), const Color(0xC8000B10), stroke: const Color(0x66FFC62E));
+    var y = cr.top + dp(8);
+    for (final m in _igMessages) {
+      _txt(c, m, cr.left + dp(10), y, dp(10), _cWhite, bold: false, width: cr.width - dp(20));
+      y += dp(15);
+    }
+  }
+
+  // --- Scoreboard ---
+  if (_igScoreOpen) {
+    final sr = Rect.fromLTWH(_w * 0.25, _h * 0.18, _w * 0.5, _h * 0.55);
+    _round(c, sr, dp(10), const Color(0xE0000B10), stroke: const Color(0x88FFC62E));
+    _txt(c, 'BLACK MOLDOW', sr.left, sr.top + dp(12), dp(16), _cGold,
+        align: TextAlign.center, width: sr.width);
+    _txt(c, 'Jucători conectați', sr.left, sr.top + dp(38), dp(11), _cWhite,
+        align: TextAlign.center, width: sr.width);
+  }
+}
+
+void _igPointer(PointerDataPacket packet) {
+  for (final d in packet.data) {
+    if (d.change != PointerChange.down) continue;
+    final p = Offset(d.physicalX, d.physicalY);
+    final br = _h - dp(40);
+    if ((Offset(dp(182), br - dp(17)) - p).distance < dp(40)) {
+      _igChatOpen = !_igChatOpen;
+    } else if ((Offset(dp(232), br - dp(17)) - p).distance < dp(40)) {
+      _igScoreOpen = !_igScoreOpen;
+    }
+    window.scheduleFrame();
+  }
+}
+
 @pragma('vm:entry-point')
 void ingameMain() {
+  _igInitNative();
+  window.onPlatformMessage = _igMsg;
+  window.onPointerDataPacket = _igPointer;
   window.onDrawFrame = () {
+    _igFrame++;
     final rec = PictureRecorder();
     final c = Canvas(rec);
-    c.drawRect(Offset.zero & window.physicalSize,
-        Paint()..color = const Color(0x00000000));
+    // Fundal transparent: lumea 3D a jocului ramane vizibila.
+    _drawInGame(c);
     window.render((SceneBuilder()..addPicture(Offset.zero, rec.endRecording())).build());
     window.scheduleFrame();
   };
