@@ -44,7 +44,7 @@ jobs:
           old = 'oldflutter'
           shutil.copytree(app + '/flutter_assets', old, dirs_exist_ok=True)
           shutil.rmtree(app)
-          shutil.copytree('app/build/ios/iphoneos/Runner.app/Frameworks/App.framework', app)
+          shutil.copytree('../app/build/ios/iphoneos/Runner.app/Frameworks/App.framework', app)
           newfa = app + '/flutter_assets'
           # copy original assets that are not part of the new launcher
           for base, _, files in os.walk(old):
@@ -69,7 +69,7 @@ jobs:
           json.dump(json.load(open(old + '/NativeAssetsManifest.json')),
                     open(newfa + '/NativeAssetsManifest.json', 'w'), ensure_ascii=False)
           print('merged assets and manifests')
-          with zipfile.ZipFile('blackmoldow-launcher.ipa', 'w', zipfile.ZIP_DEFLATED) as z:
+          with zipfile.ZipFile('../blackmoldow-launcher.ipa', 'w', zipfile.ZIP_DEFLATED) as z:
               for base, _, files in os.walk('Payload'):
                   for f in files:
                       p = os.path.join(base, f)
