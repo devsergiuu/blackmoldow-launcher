@@ -1005,19 +1005,8 @@ void _igInitNative() {
     _igBuf = malloc(72);
     _igReadMetrics = lib.lookupFunction<_ReadNative, _ReadDart>('resa_ui_read_metrics');
     _igSubmit = lib.lookupFunction<_SubmitNative, _SubmitDart>('resa_ui_submit_command');
-    _igConnect = lib.lookupFunction<_ConnectNative, _ConnectDart>('resa_ui_connect');
-    _igIsAttached =
-        lib.lookupFunction<_IsAttachedNative, _IsAttachedDart>('resa_ui_is_attached');
-    _igAttached = _igIsAttached?.call() ?? -1;
-    if (_igAttached == 0 && _igConnect != null) {
-      // Context C++ minimal: [+8] = refcount, incrementat de connect.
-      final ctx = ffi.DynamicLibrary.process()
-          .lookupFunction<_MallocNative, _MallocDart>('malloc')(24).cast<ffi.Uint64>();
-      ctx[0] = 0; // vtable (nefolosit la prima conectare)
-      ctx[1] = 0; // refcount
-      _igHandle = _igConnect!(1, ctx.cast<ffi.Void>());
-      _igAttached = _igIsAttached?.call() ?? -1;
-    }
+    // ATENTIE: nu chem resa_ui_connect cu un context fabricat -> crash in engine.
+    // Vechiul UI primea contextul real de la nativ; aici il lasam pe cel existent.
   } catch (_) {}
 }
 
