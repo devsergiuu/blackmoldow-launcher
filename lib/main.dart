@@ -254,7 +254,7 @@ void _iconBtn(Canvas c, Rect r, String icon,
   _img(c, icon, Rect.fromLTWH(r.left + pad, r.top + pad, r.width - pad * 2, r.height - pad * 2), tint: fg);
 }
 
-void _lobby(Canvas c) {
+void _lobbyOld(Canvas c) {
   final m = dp(18);
 
   // mainPlayerBlock: 206x72, marginStart 18, marginTop 20
@@ -347,6 +347,94 @@ void _lobby(Canvas c) {
       bold: false, align: TextAlign.center, width: _w);
 }
 
+void _lobby(Canvas c) {
+  final u = math.min(_w, _h);
+  final pad = u * 0.02;
+
+  // player block, stanga-sus
+  _txt(c, 'NIVEL 0', pad, u * 0.028, u * 0.040, _cWhite);
+  _txt(c, _nick, pad, u * 0.072, u * 0.052, _cWhite);
+  final bs = u * 0.075;
+  _rSettings = Rect.fromLTWH(pad + u * 0.30, u * 0.028, bs, bs);
+  _rProfile = Rect.fromLTWH(_rSettings.left, u * 0.028 + bs + pad * 0.4, bs, bs);
+  _iconBtn(c, _rSettings, 'lobby_ic_settings');
+  _iconBtn(c, _rProfile, 'lobby_ic_profile');
+
+  // balanta, dreapta-sus
+  var x = _w - pad;
+  final bh = u * 0.09;
+  _iconBtn(c, Rect.fromLTWH(x - bh, u * 0.028, bh, bh), 'lobby_ic_plus', yellow: true);
+  x -= bh + pad * 0.4;
+  _txt(c, '0', x - u * 0.05, u * 0.048, u * 0.034, _cWhite, align: TextAlign.right, width: u * 0.05);
+  x -= u * 0.06;
+  _iconBtn(c, Rect.fromLTWH(x - bh, u * 0.028, bh, bh), 'lobby_ic_crown', yellow: true);
+  x -= bh + pad * 0.3;
+  _iconBtn(c, Rect.fromLTWH(x - bh, u * 0.028, bh, bh), 'lobby_ic_swap');
+  x -= bh + pad * 0.3;
+  _txt(c, 'LEI 0', x - u * 0.24, u * 0.044, u * 0.036, _cWhite, align: TextAlign.right, width: u * 0.24);
+
+  // social, jos-stanga
+  final sy = _h - pad - u * 0.21;
+  _txt(c, 'Conturile noastre', pad, sy, u * 0.042, _cWhite);
+  _txt(c, 'pe retelele sociale', pad, sy + u * 0.048, u * 0.042, _cWhite);
+  _txt(c, 'Urmărește-ne pe rețelele sociale și\nfii la curent cu noutățile',
+      pad, sy + u * 0.10, u * 0.024, _cMuted, bold: false);
+  final sd = u * 0.085;
+  var sx = pad;
+  for (final e in [['VK', ''], ['TG', 'lobby_ic_telegram'], ['DC', '']]) {
+    final r = Rect.fromLTWH(sx, sy + u * 0.145, sd, sd);
+    _round(c, r, sd / 2, const Color(0xD20D1115), stroke: const Color(0x30FFFFFF));
+    if (e[1].isNotEmpty) {
+      _img(c, e[1], Rect.fromLTWH(r.left + sd * 0.22, r.top + sd * 0.22, sd * 0.56, sd * 0.56));
+    } else {
+      _txt(c, e[0], r.left, r.top + sd * 0.28, sd * 0.34, _cWhite, align: TextAlign.center, width: sd);
+    }
+    sx += sd + pad * 0.5;
+  }
+
+  // sloturi, dreapta
+  final sd2 = u * 0.080;
+  final xx = _w - pad - sd2;
+  var yy = u * 0.30;
+  final cols = [const Color(0xFFE94B4B), const Color(0xFF4B7BE9), const Color(0xFF3BE282)];
+  for (int i = 0; i < 3; i++) {
+    final r = Rect.fromLTWH(xx, yy, sd2, sd2);
+    _round(c, r, sd2 * 0.2, const Color(0x18FFFFFF), stroke: const Color(0x45FFFFFF));
+    _img(c, 'cross_slot_plus', Rect.fromLTWH(r.left + sd2 * 0.32, r.top + sd2 * 0.32, sd2 * 0.36, sd2 * 0.36));
+    final nb = Rect.fromLTWH(r.right - sd2 * 0.30, r.top - sd2 * 0.06, sd2 * 0.32, sd2 * 0.32);
+    _round(c, nb, nb.width / 2, cols[i], stroke: _cWhite);
+    _txt(c, '${i + 1}', nb.left, nb.top + sd2 * 0.01, sd2 * 0.20, _cWhite, align: TextAlign.center, width: nb.width);
+    yy += sd2 + pad * 0.35;
+  }
+
+  // card server, dreapta-jos
+  final cw = math.min(_w * 0.25, u * 0.40), ch = u * 0.11;
+  final cx = _w - pad - cw, cy = _h - pad - u * 0.245 - ch;
+  _round(c, Rect.fromLTWH(cx, cy, cw, ch), ch * 0.28, const Color(0xED1A1A22), stroke: const Color(0x32FFFFFF));
+  final num = Rect.fromLTWH(cx + ch * 0.12, cy + ch * 0.12, ch * 0.62, ch * 0.62);
+  _round(c, num, ch * 0.12, const Color(0xFF101015), stroke: const Color(0x70FFC62E));
+  _txt(c, '#1', num.left, num.top + ch * 0.12, ch * 0.34, _cGold, align: TextAlign.center, width: num.width);
+  final tx = num.right + ch * 0.18;
+  _txt(c, _serverName, tx, cy + ch * 0.12, ch * 0.24, _cWhite);
+  _txt(c, 'ÎNCĂRCARE MICĂ', tx, cy + ch * 0.48, ch * 0.16, _cMuted, bold: false);
+  final pr = Rect.fromLTWH(tx, cy + ch * 0.78, cw - (tx - cx) - ch * 0.18, ch * 0.05);
+  c.drawRect(pr, Paint()..color = const Color(0xFF383838));
+  c.drawRect(Rect.fromLTWH(pr.left, pr.top, pr.width * 0.08, pr.height), Paint()..color = _cGold);
+
+  // buton JOACA, dreapta-jos
+  final bw = math.min(_w * 0.25, u * 0.40), bh2 = u * 0.135;
+  _rPlay = Rect.fromLTWH(_w - pad - bw, _h - pad - bh2, bw, bh2);
+  _grad(c, _rPlay, const Color(0xFFFFB71B), const Color(0xFFFFDE72));
+  final ic = Rect.fromLTWH(_rPlay.left + bh2 * 0.10, _rPlay.top + bh2 * 0.14, bh2 * 0.68, bh2 * 0.68);
+  _round(c, ic, ic.width / 2, const Color(0x2EFFFFFF), stroke: const Color(0x4A000000));
+  _img(c, 'lobby_ic_play', Rect.fromLTWH(ic.left + ic.width * 0.28, ic.top + ic.height * 0.28,
+      ic.width * 0.44, ic.height * 0.44), tint: const Color(0xFF17191D));
+  _txt(c, 'JOACA', ic.right + bh2 * 0.16, _rPlay.top + bh2 * 0.24, bh2 * 0.40, const Color(0xFF111318));
+
+  _txt(c, 'Black Moldow  •  v2.0', 0, _h - pad * 0.6, u * 0.022, const Color(0xE0E0E0),
+      bold: false, align: TextAlign.center, width: _w);
+}
+
 void _profile(Canvas c) {
   c.drawRect(Offset.zero & Size(_w, _h), Paint()..color = const Color(0xF50B0B10));
   final m = dp(18);
@@ -430,11 +518,6 @@ Future<void> _join() async {
   _joining = false;
   window.scheduleFrame();
 }
-
-// Punctul de intrare al overlay-ului in-game. Il lasam gol ca engine-ul
-// nativ sa nu dea eroare la pornirea jocului.
-@pragma('vm:entry-point')
-void ingameMain() {}
 
 void main() {
   _dpr = window.devicePixelRatio;
