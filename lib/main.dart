@@ -534,7 +534,8 @@ Future<String> _installRoot() async {
       if (s != null && s.isNotEmpty) {
         if (s.startsWith('file://')) s = s.substring(7);
         if (Uri.tryParse(s)?.hasScheme == true) s = Uri.parse(s).toFilePath();
-        return s;
+        // refuza calea relativa gen "Documents" (intoarsa de bridge pe iOS)
+        if (s.startsWith('/')) return s;
       }
     } catch (_) {}
   }
@@ -579,13 +580,16 @@ Future<void> _downloadFiles(List<Object?> files, String root) async {
       final url = Uri.parse(f['url'].toString());
       final out = File('$root/$path');
       await out.parent.create(recursive: true);
+      final part = File('$root/$path.part');
       final req = await client.getUrl(url);
       final resp = await req.close();
-      final sink = out.openWrite();
+      final sink = part.openWrite();
       await resp.forEach((chunk) {
         sink.add(chunk);
       });
       await sink.close();
+      if (await out.exists()) await out.delete();
+      await part.rename(out.path);
       _status = 'Descarc fișiere ${i + 1}/${files.length}';
       if (i % 3 == 0) window.scheduleFrame();
     }
