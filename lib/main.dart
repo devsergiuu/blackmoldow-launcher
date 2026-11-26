@@ -1383,8 +1383,11 @@ void _drawInGame(Canvas c) {
   // Controalele touch (stick, sarit, lovit etc.) sunt desenate de engine.
   // Nu mai suprapunem butoane proprii peste ele.
   final br = _h - dp(40);
-  _igDlgLoginBtn = Rect.fromLTWH(dp(14), br - dp(28), dp(56), dp(26));
-  _igPill(c, _igDlgLoginBtn, 'LOGIN', gold: true);
+  _igDlgLoginBtn = Rect.fromLTWH(dp(14), dp(100), dp(96), dp(38));
+  _round(c, _igDlgLoginBtn, dp(8), const Color(0xDD1A1A22),
+      stroke: const Color(0xFFFFC62E), sw: dp(2));
+  _igText(c, 'LOGIN', _igDlgLoginBtn.left, _igDlgLoginBtn.top + dp(10), dp(15),
+      _cGold, 'MullerBd', align: TextAlign.center, width: _igDlgLoginBtn.width);
 
   // --- Panou chat ---
   if (_igChatOpen) {
