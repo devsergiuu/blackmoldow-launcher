@@ -97,8 +97,14 @@ Image? _bg;
 final Map<String, Image?> _icons = {};
 double _w = 0, _h = 0, _dpr = 1, _s = 1;
 bool _showProfile = false, _joining = false;
+bool _editNick = false, _kbShift = false;
+int _kbPage = 0; // 0 = litere, 1 = cifre
 String _status = '';
+String _nickDraft = '';
 Rect _rPlay = Rect.zero, _rProfile = Rect.zero, _rSettings = Rect.zero, _rBack = Rect.zero;
+Rect _rNickEdit = Rect.zero, _rNickBtn = Rect.zero, _rNickOK = Rect.zero, _rNickCancel = Rect.zero, _rKbToggle = Rect.zero;
+final List<Rect> _keyRects = <Rect>[];
+final List<String> _keyLabels = <String>[];
 
 double dp(double v) => v * _s;
 
@@ -168,8 +174,25 @@ Object? _parseBplist(List<int> b) {
 }
 
 Future<void> _readNick() async {
+  final home = Platform.environment['HOME'];
+  // Preferim fisierul scris de launcher (editabil in aplicatie).
+  final files = <String>[
+    if (home != null) '$home/Documents/nickname.txt',
+    '${Directory.current.path}/Documents/nickname.txt',
+  ];
+  for (final p in files) {
+    try {
+      final f = File(p);
+      if (!await f.exists()) continue;
+      final s = (await f.readAsString()).trim();
+      if (s.isNotEmpty) {
+        _nick = s;
+        return;
+      }
+    } catch (_) {}
+  }
+  // Fallback: client_settings.plist (vechiul launcher).
   try {
-    final home = Platform.environment['HOME'];
     if (home == null) return;
     final f = File('$home/Library/Preferences/client_settings.plist');
     if (!await f.exists()) return;
@@ -177,6 +200,13 @@ Future<void> _readNick() async {
     if (obj is Map && obj['nick_name'] is String && (obj['nick_name'] as String).isNotEmpty) {
       _nick = obj['nick_name'] as String;
     }
+  } catch (_) {}
+}
+
+Future<void> _saveNick(String s) async {
+  try {
+    final root = await _installRoot();
+    await File('$root/nickname.txt').writeAsString(s);
   } catch (_) {}
 }
 
@@ -451,7 +481,12 @@ void _profile(Canvas c) {
   _img(c, 'lobby_ic_back', Rect.fromLTWH(_rBack.left + dp(9), _rBack.top + dp(9), dp(18), dp(18)));
   _txt(c, 'CONTUL MEU', _rBack.right + dp(10), dp(18), dp(14), _cWhite);
   var y = dp(52);
+  _rNickEdit = Rect.fromLTWH(m - dp(4), y - dp(4), dp(230), dp(28));
+  _round(c, _rNickEdit, dp(6), const Color(0x22FFFFFF), stroke: const Color(0x55FFC62E));
   _txt(c, _nick, m, y, dp(15.5), _cWhite);
+  _round(c, Rect.fromLTWH(_rNickEdit.right + dp(6), y, dp(26), dp(22)), dp(5), _cGold);
+  _txt(c, '✎', _rNickEdit.right + dp(6), y + dp(1), dp(16), const Color(0xFF111318),
+      align: TextAlign.center, width: dp(26));
   y += dp(30);
   _txt(c, 'NV. 0', m, y, dp(9), _cWhite, bold: false);
   _txt(c, '0/1', m + dp(250), y, dp(7.1), const Color(0xB8FFFFFF), bold: false);
@@ -473,6 +508,91 @@ void _profile(Canvas c) {
   final lo = Rect.fromLTWH(m, y + 3 * (ch + dp(6)), dp(290), dp(38));
   _round(c, lo, dp(8), const Color(0xFF3A1215), stroke: const Color(0x66FF6B6B));
   _txt(c, 'ȘTERGE PERSONAJUL', lo.left, lo.top + dp(12), dp(9), _cWhite, align: TextAlign.center, width: lo.width);
+  // Buton explicit pentru schimbarea numelui.
+  final nb = Rect.fromLTWH(m, lo.bottom + dp(8), dp(290), dp(34));
+  _round(c, nb, dp(8), const Color(0xFF1A1A22), stroke: const Color(0x66FFC62E));
+  _txt(c, 'SCHIMBĂ NUMELE', nb.left, nb.top + dp(9), dp(10), _cGold,
+      align: TextAlign.center, width: nb.width);
+  _rNickBtn = nb;
+}
+
+// ---- editor de nickname cu tastatura desenata (fara TextInputClient) ----
+void _keyTap(String label) {
+  if (label == '⌫') {
+    if (_nickDraft.isNotEmpty) {
+      _nickDraft = _nickDraft.substring(0, _nickDraft.length - 1);
+    }
+  } else if (label == '␣') {
+    if (_nickDraft.length < 24) _nickDraft += ' ';
+  } else if (label == '⇧') {
+    _kbShift = !_kbShift;
+  } else if (label == '123') {
+    _kbPage = 1;
+  } else if (label == 'ABC') {
+    _kbPage = 0;
+  } else if (_nickDraft.length < 24) {
+    _nickDraft += _kbShift ? label.toUpperCase() : label.toLowerCase();
+  }
+  window.scheduleFrame();
+}
+
+void _drawNickEditor(Canvas c) {
+  c.drawRect(Offset.zero & Size(_w, _h), Paint()..color = const Color(0xF50B0B10));
+  _txt(c, 'SCHIMBĂ NUMELE', 0, dp(44), dp(18), _cGold,
+      align: TextAlign.center, width: _w);
+
+  final m = dp(16);
+  final field = Rect.fromLTWH(m, dp(92), _w - m * 2, dp(50));
+  _round(c, field, dp(9), _cSurface, stroke: const Color(0x88FFC62E));
+  final shown = _nickDraft.isEmpty ? '' : _nickDraft;
+  _txt(c, shown, field.left + dp(11), field.top + dp(10), dp(17), _cWhite, bold: false);
+  final cursorX = field.left + dp(11) + dp(shown.length * 17 * 0.56);
+  c.drawRect(Rect.fromLTWH(cursorX, field.top + dp(10), dp(2), dp(28)),
+      Paint()..color = _cGold);
+
+  _keyRects.clear();
+  _keyLabels.clear();
+  final List<List<String>> rows = _kbPage == 0
+      ? [
+          ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+          ['⇧', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+          ['123', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '␣', '⌫'],
+        ]
+      : [
+          ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+          ['-', '@', '_', '.', ',', '!', '?', ':', '#', '/'],
+          ['ABC', '␣', '⌫'],
+        ];
+  final kw = dp(34), kh = dp(38), gap = dp(4);
+  final y0 = dp(168);
+  for (int r = 0; r < rows.length; r++) {
+    final row = rows[r];
+    final totalW = row.length * kw + (row.length - 1) * gap;
+    final x0 = (_w - totalW) / 2;
+    for (int i = 0; i < row.length; i++) {
+      final label = row[i];
+      final kr = Rect.fromLTWH(x0 + i * (kw + gap), y0 + r * (kh + gap), kw, kh);
+      final hot = (label == '⇧' && _kbShift) || (label == 'ABC' && _kbPage == 1) ||
+          (label == '123' && _kbPage == 0);
+      _round(c, kr, dp(6), hot ? const Color(0x66FFC62E) : const Color(0x2EFFFFFF),
+          stroke: const Color(0x22FFFFFF));
+      _txt(c, label, kr.left, kr.top + dp(9), label.length > 1 ? dp(10) : dp(14),
+          hot ? _cGold : _cWhite, align: TextAlign.center, width: kw);
+      _keyRects.add(kr);
+      _keyLabels.add(label);
+    }
+  }
+
+  final by = y0 + 3 * (kh + gap) + dp(12);
+  final bw = (_w - m * 2 - gap) / 2;
+  _rNickCancel = Rect.fromLTWH(m, by, bw, dp(44));
+  _rNickOK = Rect.fromLTWH(m + bw + gap, by, bw, dp(44));
+  _round(c, _rNickCancel, dp(8), const Color(0x33FFFFFF), stroke: const Color(0x55FFFFFF));
+  _txt(c, 'ANULARE', _rNickCancel.left, _rNickCancel.top + dp(14), dp(12), _cWhite,
+      align: TextAlign.center, width: bw);
+  _round(c, _rNickOK, dp(8), const Color(0xFFFFC933));
+  _txt(c, 'OK', _rNickOK.left, _rNickOK.top + dp(12), dp(14), const Color(0xFF111318),
+      align: TextAlign.center, width: bw);
 }
 
 void _paint(Canvas c) {
@@ -484,6 +604,10 @@ void _paint(Canvas c) {
   // _s converteste dp -> pixeli fizici (referinta 390x844 dp, ca activity_main.xml)
   _s = math.min(_w / 390.0, _h / 844.0);
   _background(c);
+  if (_editNick) {
+    _drawNickEditor(c);
+    return;
+  }
   if (_showProfile) {
     _profile(c);
     return;
@@ -498,8 +622,38 @@ void _pointer(PointerDataPacket packet) {
   for (final d in packet.data) {
     if (d.change != PointerChange.down) continue;
     final p = Offset(d.physicalX, d.physicalY);
+    if (_editNick) {
+      if (_rNickOK.contains(p)) {
+        final s = _nickDraft.trim();
+        if (s.isNotEmpty) {
+          _nick = s;
+          _saveNick(s);
+        }
+        _editNick = false;
+      } else if (_rNickCancel.contains(p)) {
+        _editNick = false;
+      } else {
+        for (int i = 0; i < _keyRects.length; i++) {
+          if (_keyRects[i].contains(p)) {
+            _keyTap(_keyLabels[i]);
+            break;
+          }
+        }
+      }
+      window.scheduleFrame();
+      continue;
+    }
     if (_showProfile) {
-      if (_rBack.contains(p)) { _showProfile = false; window.scheduleFrame(); }
+      if (_rBack.contains(p)) {
+        _showProfile = false;
+        window.scheduleFrame();
+      } else if (_rNickEdit.contains(p) || _rNickBtn.contains(p)) {
+        _nickDraft = _nick;
+        _kbShift = false;
+        _kbPage = 0;
+        _editNick = true;
+        window.scheduleFrame();
+      }
     } else if (_rPlay.contains(p)) {
       _join();
     } else if (_rProfile.contains(p) || _rSettings.contains(p)) {
@@ -541,6 +695,16 @@ String? _replyError(ByteData? r) {
   }
   final t = s.toString().trim();
   return t.isEmpty ? 'eroare necunoscuta' : t;
+}
+
+// ---- bool din raspuns StandardMethodCodec: 0x00 success + 0x01 true / 0x02 false ----
+bool? _replyBool(ByteData? r) {
+  if (r == null || r.lengthInBytes < 2) return null;
+  final b = Uint8List.sublistView(r);
+  if (b[0] != 0) return null;
+  if (b[1] == 1) return true;
+  if (b[1] == 2) return false;
+  return null;
 }
 
 Future<String> _installRoot() async {
@@ -637,8 +801,9 @@ Future<void> _join() async {
   _joining = true;
   _status = 'Verific fișierele jocului...';
   window.scheduleFrame();
+  String root;
   try {
-    final root = await _installRoot();
+    root = await _installRoot();
     _status = 'Descarc lista de fișiere...';
     window.scheduleFrame();
     final files = await _manifest();
@@ -666,16 +831,31 @@ Future<void> _join() async {
   try {
     final expiry = DateTime.now().add(const Duration(days: 1)).millisecondsSinceEpoch ~/ 1000;
     final reply = await _send(_channelHost, _call('startGame', <String, Object?>{
+      // installRoot este obligatoriu: handler-ul il valideaza inainte de orice.
+      'installRoot': root,
+      'nickname': _nick,
       'host': _ip,
       'port': _port,
-      'nickname': _nick,
       'password': '',
       'serverName': _serverName,
       'sessionToken': 'bm-local-${DateTime.now().millisecondsSinceEpoch}',
       'sessionExpiresAt': expiry,
+      'hasRun': true,
+      'uiState': 'lobby',
     }));
     final err = _replyError(reply);
-    _status = err == null ? '' : 'Jocul nu a pornit: $err';
+    if (err != null) {
+      _status = 'Jocul nu a pornit: $err';
+    } else {
+      final ok = _replyBool(reply);
+      if (ok == true) {
+        _status = '';
+      } else if (ok == false) {
+        _status = 'Jocul nu a pornit (bridge: false)';
+      } else {
+        _status = 'Jocul nu a pornit (răspuns necunoscut)';
+      }
+    }
   } catch (e) {
     _status = 'Eroare start: $e';
   }
