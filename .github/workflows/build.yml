@@ -33,34 +33,49 @@ jobs:
 
       - name: Assemble final IPA with the original client
         run: |
-          set -e
-          mkdir -p out
-          cd out
-          unzip -q ../base.ipa -d .
-          APP=Payload/ReSALauncher.app/Frameworks/App.framework
-          mkdir -p oldflutter
-          cp -R "$APP/flutter_assets/." oldflutter/
-          rm -rf "$APP"
-          cp -R ../app/build/ios/iphoneos/Runner.app/Frameworks/App.framework "$APP"
-          cp -Rn oldflutter/. "$APP/flutter_assets/"
           python3 - <<'PY'
-          import json, os
-          new = 'Payload/ReSALauncher.app/Frameworks/App.framework/flutter_assets/'
-          old = 'oldflutter/'
-          am = json.load(open(old + 'AssetManifest.json'))
-          am.update(json.load(open(new + 'AssetManifest.json')))
-          json.dump(am, open(new + 'AssetManifest.json', 'w'), ensure_ascii=False)
-          fm = json.load(open(old + 'FontManifest.json'))
-          families = {f.get('family') for f in fm}
-          for f in json.load(open(new + 'FontManifest.json')):
-              if f.get('family') not in families:
+          import json, os, shutil, zipfile
+          out = 'out'
+          os.makedirs(out, exist_ok=True)
+          with zipfile.ZipFile('../base.ipa') as z:
+              z.extractall(out)
+          os.chdir(out)
+          app = 'Payload/ReSALauncher.app/Frameworks/App.framework'
+          old = 'oldflutter'
+          shutil.copytree(app + '/flutter_assets', old, dirs_exist_ok=True)
+          shutil.rmtree(app)
+          shutil.copytree('../app/build/ios/iphoneos/Runner.app/Frameworks/App.framework', app)
+          newfa = app + '/flutter_assets'
+          # copy original assets that are not part of the new launcher
+          for base, _, files in os.walk(old):
+              rel = os.path.relpath(base, old)
+              dst = os.path.join(newfa, rel)
+              os.makedirs(dst, exist_ok=True)
+              for f in files:
+                  s = os.path.join(base, f)
+                  d = os.path.join(dst, f)
+                  if not os.path.exists(d):
+                      shutil.copy2(s, d)
+          # merge manifests
+          am = json.load(open(old + '/AssetManifest.json'))
+          am.update(json.load(open(newfa + '/AssetManifest.json')))
+          json.dump(am, open(newfa + '/AssetManifest.json', 'w'), ensure_ascii=False)
+          fm = json.load(open(old + '/FontManifest.json'))
+          fam = {f.get('family') for f in fm}
+          for f in json.load(open(newfa + '/FontManifest.json')):
+              if f.get('family') not in fam:
                   fm.append(f)
-          json.dump(fm, open(new + 'FontManifest.json', 'w'), ensure_ascii=False)
-          json.dump(json.load(open(old + 'NativeAssetsManifest.json')),
-                    open(new + 'NativeAssetsManifest.json', 'w'), ensure_ascii=False)
-          print('merged manifests')
+          json.dump(fm, open(newfa + '/FontManifest.json', 'w'), ensure_ascii=False)
+          json.dump(json.load(open(old + '/NativeAssetsManifest.json')),
+                    open(newfa + '/NativeAssetsManifest.json', 'w'), ensure_ascii=False)
+          print('merged assets and manifests')
+          with zipfile.ZipFile('../blackmoldow-launcher.ipa', 'w', zipfile.ZIP_DEFLATED) as z:
+              for base, _, files in os.walk('Payload'):
+                  for f in files:
+                      p = os.path.join(base, f)
+                      z.write(p, p)
+          print('IPA written')
           PY
-          zip -qr ../blackmoldow-launcher.ipa Payload
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
