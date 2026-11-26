@@ -1283,9 +1283,20 @@ void _igPointer(PointerDataPacket packet) {
   }
 }
 
+void _igHandshake() {
+  // Vechiul UI trimitea aceste metode catre nativ la pornire; fara ele
+  // motorul nu marcheaza UI-ul ca fiind gata si nu afiseaza dialogurile.
+  _send(_igChan, _call('getConfiguration', <String, Object?>{})).catchError((_) {});
+  _send(_igChan, _call('uiReady', <String, Object?>{
+    'state': 'ready',
+    'abiVersion': 1,
+  })).catchError((_) {});
+}
+
 @pragma('vm:entry-point')
 void ingameMain() {
   _igInitNative();
+  _igHandshake();
   window.onPlatformMessage = _igMsg;
   window.onPointerDataPacket = _igPointer;
   window.onDrawFrame = () {
