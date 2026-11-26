@@ -530,6 +530,19 @@ String? _replyString(ByteData? r) {
   return utf8.decode(b.sublist(i, i + n));
 }
 
+// ---- eroarea din raspuns StandardMethodCodec (0x01 + cod + mesaj + detalii) ----
+String? _replyError(ByteData? r) {
+  if (r == null || r.lengthInBytes < 2) return null;
+  final b = Uint8List.sublistView(r);
+  if (b[0] != 1) return null;
+  final s = StringBuffer();
+  for (final x in b) {
+    if (x >= 32 && x < 127) s.writeCharCode(x);
+  }
+  final t = s.toString().trim();
+  return t.isEmpty ? 'eroare necunoscuta' : t;
+}
+
 Future<String> _installRoot() async {
   // Doar metode care EXISTA in bridge-ul nativ: installRoot / externalFilesDir.
   // (installRootURL nu exista -> bridge intoarce FlutterMethodNotImplemented,
@@ -652,7 +665,7 @@ Future<void> _join() async {
   window.scheduleFrame();
   try {
     final expiry = DateTime.now().add(const Duration(days: 1)).millisecondsSinceEpoch ~/ 1000;
-    await _send(_channelHost, _call('startGame', <String, Object?>{
+    final reply = await _send(_channelHost, _call('startGame', <String, Object?>{
       'host': _ip,
       'port': _port,
       'nickname': _nick,
@@ -661,7 +674,8 @@ Future<void> _join() async {
       'sessionToken': 'bm-local-${DateTime.now().millisecondsSinceEpoch}',
       'sessionExpiresAt': expiry,
     }));
-    _status = '';
+    final err = _replyError(reply);
+    _status = err == null ? '' : 'Jocul nu a pornit: $err';
   } catch (e) {
     _status = 'Eroare start: $e';
   }
