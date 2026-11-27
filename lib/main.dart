@@ -989,6 +989,7 @@ _AcquireDart? _igAcquire;
 _IsAttachedDart? _igIsAttached;
 ffi.Pointer<ffi.Void>? _igBuf, _igHandle;
 int _igAttached = -1;
+int _igBase = 0;
 
 void _igLoadAssets() {
   loadImage('assets/auth/auth_bg.png').then((v) {
@@ -1014,6 +1015,7 @@ void _igInitNative() {
     // global la 0x1f4e2a0 in alyn_resa.
     final sym = lib.lookup('resa_ui_abi_version');
     final base = sym.address - 0xa70998;
+    _igBase = base;
     final hp = ffi.Pointer<ffi.Pointer<ffi.Void>>.fromAddress(base + 0x1f4e2a0);
     final real = hp.value;
     if (real == ffi.Pointer<ffi.Void>.fromAddress(0)) {
@@ -1031,17 +1033,23 @@ void _igInitNative() {
 // Citeste evenimentele din batch-ul UI al engine-ului (dialoguri etc.).
 void _igPollBatch() {
   try {
-    if (_igAcquire == null || _igHandle == null) return;
-    final batch = _igAcquire!(_igHandle!);
+    if (_igAcquire == null || _igBase == 0) return;
+    // Recitest handle-ul: la pornire putea fi 0, iar nativul il seteaza mai tarziu.
+    final hp = ffi.Pointer<ffi.Pointer<ffi.Void>>.fromAddress(_igBase + 0x1f4e2a0);
+    final handle = hp.value;
+    if (handle == ffi.Pointer<ffi.Void>.fromAddress(0)) return;
+    final batch = _igAcquire!(handle);
     if (batch == ffi.Pointer<ffi.Void>.fromAddress(0)) return;
     final w = batch.cast<ffi.Uint64>();
     final start = ffi.Pointer<ffi.Uint8>.fromAddress(w[5]); // +0x28
     final end = w[7]; // +0x38
     final count = (end - w[5]) ~/ 0x30;
     if (count <= 0 || count > 64) return;
+    final dbg = StringBuffer();
     for (int k = 0; k < count; k++) {
       final rec = ffi.Pointer<ffi.Uint8>.fromAddress(w[5] + k * 0x30);
       final raw = rec.asTypedList(0x30);
+      dbg.writeln('$k ${raw.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
       // Cauta siruri ASCII in inregistrare.
       final strs = <String>[];
       final buf = StringBuffer();
@@ -1068,8 +1076,16 @@ void _igPollBatch() {
       _igInput = '';
       _igDialogOpen = true;
       window.scheduleFrame();
+      try {
+        File('${Directory.current.path}/Documents/logcat/batch_dump.txt')
+            .writeAsStringSync(dbg.toString());
+      } catch (_) {}
       return;
     }
+    try {
+      File('${Directory.current.path}/Documents/logcat/batch_dump.txt')
+          .writeAsStringSync(dbg.toString());
+    } catch (_) {}
   } catch (_) {}
 }
 
