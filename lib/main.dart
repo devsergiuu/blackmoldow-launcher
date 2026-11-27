@@ -1015,14 +1015,16 @@ void _igInitNative() {
     final sym = lib.lookup('resa_ui_abi_version');
     final base = sym.address - 0xa70998;
     final hp = ffi.Pointer<ffi.Pointer<ffi.Void>>.fromAddress(base + 0x1f4e2a0);
-    if (hp.value == ffi.Pointer<ffi.Void>.fromAddress(0)) {
-      // Native inca nu a pus handle-ul. Scriem un marcator NON-null ca
-      // resa_ui_is_attached() sa returneze true. Nu folosim acest pointer
-      // pentru acquire_batch/submit (ar fi interpretat ca obiect C++).
+    final real = hp.value;
+    if (real == ffi.Pointer<ffi.Void>.fromAddress(0)) {
+      // Nu exista handle real: punem doar marcator pentru is_attached,
+      // dar NU il folosim in FFI (ar fi dereferentat ca obiect C++).
       hp.value = malloc(16).cast<ffi.Void>();
+      _igHandle = null;
+    } else {
+      _igHandle = real;
     }
-    _igHandle = null; // nu apelam FFI care dereferenteaza handle-ul
-    _igAttached = hp.value != ffi.Pointer<ffi.Void>.fromAddress(0) ? 1 : 0;
+    _igAttached = 1;
   } catch (_) {}
 }
 
@@ -1198,6 +1200,11 @@ void _igMsg(String name, ByteData? data, void Function(ByteData?)? reply) {
     final method = r.value();
     if (method is! String) return;
     final args = r.value();
+    try {
+      final log = File('${Directory.current.path}/Documents/logcat/dart_methods.txt');
+      log.writeAsStringSync('${DateTime.now().toIso8601String()} $method ${args.toString()}\n',
+          mode: FileMode.append);
+    } catch (_) {}
     // Dialog SA-MP: titlu + text + butoane + camp de introducere.
     if (args is Map) {
       final cap = args['caption'] ?? args['title'] ?? args['header'];
