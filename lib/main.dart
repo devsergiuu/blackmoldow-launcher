@@ -1459,12 +1459,8 @@ void _drawInGame(Canvas c) {
 
   // Controalele touch (stick, sarit, lovit etc.) sunt desenate de engine.
   // Nu mai suprapunem butoane proprii peste ele.
-  final br = _h - dp(40);
-  _igDlgLoginBtn = Rect.fromLTWH(dp(14), dp(100), dp(96), dp(38));
-  _round(c, _igDlgLoginBtn, dp(8), const Color(0xDD1A1A22),
-      stroke: const Color(0xFFFFC62E), sw: dp(2));
-  _igText(c, 'LOGIN', _igDlgLoginBtn.left, _igDlgLoginBtn.top + dp(10), dp(15),
-      _cGold, 'MullerBd', align: TextAlign.center, width: _igDlgLoginBtn.width);
+  // Fara buton LOGIN propriu — las doar dialogurile reale ale jocului.
+  _igDlgLoginBtn = Rect.zero;
 
   // --- Panou chat ---
   if (_igChatOpen) {
@@ -1520,12 +1516,7 @@ void _igPointer(PointerDataPacket packet) {
       window.scheduleFrame();
       continue;
     }
-    if (_igDlgLoginBtn.contains(p)) {
-      _igDialogOpen = true;
-      _igInput = _password;
-      _igDkShift = false;
-      _igDkPage = 0;
-    } else if ((Offset(dp(179), _h - dp(53)) - p).distance < dp(36)) {
+    if ((Offset(dp(179), _h - dp(53)) - p).distance < dp(36)) {
       _igChatOpen = !_igChatOpen;
     } else if ((Offset(dp(224), _h - dp(53)) - p).distance < dp(36)) {
       _igScoreOpen = !_igScoreOpen;
@@ -1560,7 +1551,7 @@ void ingameMain() {
   _igInitNative();
   _igLoadAssets();
   _readNick(); // isolate separat: incarc nick_name + server_password din plist
-  _igDialogOpen = true; // se deschide la conectarea pe server (ca pe Android)
+  _igDialogOpen = false; // NU mai afisam login propriu; doar dialogurile reale ale serverului
   _igHandshake();
   window.onPlatformMessage = _igMsg;
   window.onPointerDataPacket = _igPointer;
