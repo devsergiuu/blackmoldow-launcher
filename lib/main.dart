@@ -1522,13 +1522,22 @@ void _igPointer(PointerDataPacket packet) {
 }
 
 void _igHandshake() {
-  // Vechiul UI trimitea aceste metode catre nativ la pornire; fara ele
-  // motorul nu marcheaza UI-ul ca fiind gata si nu afiseaza dialogurile.
+  // Vechiul UI trimitea aceste metode catre nativ la pornire. Daca sunt
+  // trimise prea devreme, mesajul se pierde si motorul face timeout (~secunde)
+  // si revine in launcher. De aceea le retrimit periodic.
   _send(_igChan, _call('getConfiguration', <String, Object?>{})).catchError((_) {});
-  _send(_igChan, _call('uiReady', <String, Object?>{
-    'state': 'ready',
-    'abiVersion': 1,
-  })).catchError((_) {});
+  void sendReady() {
+    _send(_igChan, _call('uiReady', <String, Object?>{
+      'state': 'ready',
+      'abiVersion': 1,
+    })).catchError((_) {});
+  }
+
+  sendReady();
+  Timer(const Duration(milliseconds: 500), sendReady);
+  Timer(const Duration(seconds: 1), sendReady);
+  Timer(const Duration(seconds: 2), sendReady);
+  Timer(const Duration(seconds: 4), sendReady);
 }
 
 @pragma('vm:entry-point')
