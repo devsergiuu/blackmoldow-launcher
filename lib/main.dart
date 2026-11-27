@@ -990,6 +990,9 @@ _IsAttachedDart? _igIsAttached;
 ffi.Pointer<ffi.Void>? _igBuf, _igHandle;
 int _igAttached = -1;
 int _igBase = 0;
+// Referente globale: altfel GC elibereaza callback-ul si vtable devine invalida.
+ffi.NativeCallable<ffi.Void Function()>? _igCb;
+ffi.Pointer<ffi.Void>? _igVtKept, _igCtxKept;
 
 void _igLoadAssets() {
   loadImage('assets/auth/auth_bg.png').then((v) {
@@ -1017,14 +1020,20 @@ void _igInitNative() {
     final base = sym.address - 0xa70998;
     _igBase = base;
     final hp = ffi.Pointer<ffi.Pointer<ffi.Void>>.fromAddress(base + 0x1f4e2a0);
-    final real = hp.value;
-    if (real == ffi.Pointer<ffi.Void>.fromAddress(0)) {
-      // Nu exista handle real: punem doar marcator pentru is_attached,
-      // dar NU il folosim in FFI (ar fi dereferentat ca obiect C++).
-      hp.value = malloc(16).cast<ffi.Void>();
-      _igHandle = null;
-    } else {
-      _igHandle = real;
+    _igHandle = hp.value;
+    if (_igHandle == ffi.Pointer<ffi.Void>.fromAddress(0)) {
+      _igCb = ffi.NativeCallable<ffi.Void Function()>.listener(() {});
+      final vt = malloc(24).cast<ffi.Pointer<ffi.Void>>();
+      vt[0] = ffi.Pointer<ffi.Void>.fromAddress(0);
+      vt[1] = ffi.Pointer<ffi.Void>.fromAddress(0);
+      vt[2] = _igCb!.nativeFunction.cast<ffi.Void>();
+      _igVtKept = vt.cast<ffi.Void>();
+      final ctx = malloc(24).cast<ffi.Uint64>();
+      ctx[0] = vt.address;
+      ctx[1] = 0;
+      _igCtxKept = ctx.cast<ffi.Void>();
+      _igConnect = lib.lookupFunction<_ConnectNative, _ConnectDart>('resa_ui_connect');
+      _igHandle = _igConnect!(1, _igCtxKept!);
     }
     _igAttached = 1;
   } catch (_) {}
