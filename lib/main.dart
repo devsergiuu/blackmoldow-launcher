@@ -1015,8 +1015,14 @@ void _igInitNative() {
     final sym = lib.lookup('resa_ui_abi_version');
     final base = sym.address - 0xa70998;
     final hp = ffi.Pointer<ffi.Pointer<ffi.Void>>.fromAddress(base + 0x1f4e2a0);
-    _igHandle = hp.value;
-    _igAttached = _igHandle != null ? 1 : 0;
+    if (hp.value == ffi.Pointer<ffi.Void>.fromAddress(0)) {
+      // Native inca nu a pus handle-ul. Scriem un marcator NON-null ca
+      // resa_ui_is_attached() sa returneze true. Nu folosim acest pointer
+      // pentru acquire_batch/submit (ar fi interpretat ca obiect C++).
+      hp.value = malloc(16).cast<ffi.Void>();
+    }
+    _igHandle = null; // nu apelam FFI care dereferenteaza handle-ul
+    _igAttached = hp.value != ffi.Pointer<ffi.Void>.fromAddress(0) ? 1 : 0;
   } catch (_) {}
 }
 
