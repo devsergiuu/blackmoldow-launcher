@@ -1009,24 +1009,14 @@ void _igInitNative() {
     _igReadMetrics = lib.lookupFunction<_ReadNative, _ReadDart>('resa_ui_read_metrics');
     _igSubmit = lib.lookupFunction<_SubmitNative, _SubmitDart>('resa_ui_submit_command');
     _igAcquire = lib.lookupFunction<_AcquireNative, _AcquireDart>('resa_ui_acquire_batch');
-    // Context C++ cu vtable VALIDA. Motorul elibereaza contextul prin
-    // vtable[2] la disconnect; un pointer gol acolo dadea EXC_BAD_ACCESS.
-    _igConnect = lib.lookupFunction<_ConnectNative, _ConnectDart>('resa_ui_connect');
-    _igIsAttached =
-        lib.lookupFunction<_IsAttachedNative, _IsAttachedDart>('resa_ui_is_attached');
-    _igAttached = _igIsAttached?.call() ?? -1;
-    if (_igAttached == 0) {
-      final cb = ffi.NativeCallable<ffi.Void Function()>.listener(() {});
-      final vt = malloc(24).cast<ffi.Pointer<ffi.Void>>();
-      vt[0] = ffi.Pointer<ffi.Void>.fromAddress(0);
-      vt[1] = ffi.Pointer<ffi.Void>.fromAddress(0);
-      vt[2] = cb.nativeFunction.cast<ffi.Void>();
-      final ctx = malloc(24).cast<ffi.Uint64>();
-      ctx[0] = vt.address;
-      ctx[1] = 0; // refcount, incrementat de connect
-      _igHandle = _igConnect!(1, ctx.cast<ffi.Void>());
-      _igAttached = _igIsAttached?.call() ?? -1;
-    }
+    // Nu chem resa_ui_connect (crash). Citesc handle-ul real din memoria
+    // motorului: simbolul resa_ui_abi_version e la 0xa70998, iar handle-ul
+    // global la 0x1f4e2a0 in alyn_resa.
+    final sym = lib.lookup('resa_ui_abi_version');
+    final base = sym.address - 0xa70998;
+    final hp = ffi.Pointer<ffi.Pointer<ffi.Void>>.fromAddress(base + 0x1f4e2a0);
+    _igHandle = hp.value;
+    _igAttached = _igHandle != null ? 1 : 0;
   } catch (_) {}
 }
 
