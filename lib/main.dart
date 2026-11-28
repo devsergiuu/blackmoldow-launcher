@@ -1036,6 +1036,12 @@ void _igInitNative() {
       _igCtxKept = ctx.cast<ffi.Void>();
       _igConnect = lib.lookupFunction<_ConnectNative, _ConnectDart>('resa_ui_connect');
       _igHandle = _igConnect!(1, _igCtxKept!);
+      // Obiectul returnat are contextul la +0x50. Il golim: submit_command
+      // va lua calea "fara context" in loc sa apeleze vtable-ul nostru.
+      if (_igHandle != null) {
+        final slot = ffi.Pointer<ffi.Uint64>.fromAddress(_igHandle!.address + 0x50);
+        slot.value = 0;
+      }
     } else {
       _igHandle = real;
     }
