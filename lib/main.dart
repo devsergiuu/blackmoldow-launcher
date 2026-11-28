@@ -1043,11 +1043,25 @@ void _igPollBatch() {
     if (handle == ffi.Pointer<ffi.Void>.fromAddress(0)) return;
     final batch = _igAcquire!(handle);
     if (batch == ffi.Pointer<ffi.Void>.fromAddress(0)) return;
+    final raw = batch.cast<ffi.Uint8>().asTypedList(0x40);
     final w = batch.cast<ffi.Uint64>();
+    final dbgRaw = StringBuffer('HANDLE=${handle.address} BATCH=${batch.address}\n'
+        'RAW ${raw.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}\n'
+        'WORDS ${List.generate(8, (i) => w[i].toRadixString(16)).join(' ')}\n');
+    try {
+      File('${Directory.current.path}/Documents/logcat/batch_dump.txt')
+          .writeAsStringSync(dbgRaw.toString());
+    } catch (_) {}
     final start = ffi.Pointer<ffi.Uint8>.fromAddress(w[5]); // +0x28
     final end = w[7]; // +0x38
     final count = (end - w[5]) ~/ 0x30;
-    if (count <= 0 || count > 64) return;
+    if (count <= 0 || count > 64) {
+      try {
+        File('${Directory.current.path}/Documents/logcat/batch_dump.txt')
+            .writeAsStringSync(dbgRaw.toString() + 'COUNT=$count\n');
+      } catch (_) {}
+      return;
+    }
     final dbg = StringBuffer();
     for (int k = 0; k < count; k++) {
       final rec = ffi.Pointer<ffi.Uint8>.fromAddress(w[5] + k * 0x30);
