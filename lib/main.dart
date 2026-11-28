@@ -1024,11 +1024,11 @@ void _igInitNative() {
     // non-null ca is_attached sa dea true, fara a-l folosi in FFI.
     final real = hp.value;
     if (real == ffi.Pointer<ffi.Void>.fromAddress(0)) {
+      // Marcator: e scris in globalul de la g+0x2a0. acquire_batch/submit_command
+      // DOAR compara handle-ul cu acest global, nu il dereferenteaza -> sigur.
       hp.value = malloc(16).cast<ffi.Void>();
-      _igHandle = null;
-    } else {
-      _igHandle = real;
     }
+    _igHandle = hp.value;
     _igAttached = 1;
   } catch (_) {}
 }
