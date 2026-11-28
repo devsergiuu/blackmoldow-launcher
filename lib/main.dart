@@ -1,4 +1,4 @@
-﻿// Black Moldow launcher вЂ” dart:ui pur. Layout dupa activity_main.xml,
+// Black Moldow launcher — dart:ui pur. Layout dupa activity_main.xml,
 // cu drawable-urile reale din proiectul Android. Inlocuieste App.framework/App.
 import 'dart:async';
 import 'dart:convert';
@@ -376,7 +376,7 @@ void _lobbyDp(Canvas c) {
   _rLobbyNick = Rect.fromLTWH(px - dp(4), py + dp(22), dp(200), dp(32));
   _round(c, _rLobbyNick, dp(6), const Color(0x22FFFFFF), stroke: const Color(0x66FFC62E));
   _txt(c, _nick, px, py + dp(26), dp(21), _cWhite);
-  _txt(c, 'вњЋ', _rLobbyNick.right - dp(22), py + dp(28), dp(15), _cGold);
+  _txt(c, '✎', _rLobbyNick.right - dp(22), py + dp(28), dp(15), _cGold);
   final bs = dp(30);
   _rSettings = Rect.fromLTWH(px + dp(206) - bs, py, bs, bs);
   _rProfile = Rect.fromLTWH(_rSettings.left, py + dp(40), bs, bs);
@@ -402,7 +402,7 @@ void _lobbyDp(Canvas c) {
   // socialPanel: 390x166, marginStart 18, marginBottom 18
   final sy = _h - m - dp(166);
   _txt(c, 'Conturile noastre\npe retelele sociale', m, sy, dp(20), _cWhite);
-  _txt(c, 'UrmДѓreИ™te-ne pe reИ›elele sociale И™i\nfii la curent cu noutДѓИ›ile', m, sy + dp(60), dp(12), _cMuted, bold: false);
+  _txt(c, 'Urmărește-ne pe rețelele sociale și\nfii la curent cu noutățile', m, sy + dp(60), dp(12), _cMuted, bold: false);
   final sd = dp(48);
   var sx = m;
   for (final e in [
@@ -444,7 +444,7 @@ void _lobbyDp(Canvas c) {
   _txt(c, '#1', num.left, num.top + dp(6), dp(15), _cGold, align: TextAlign.center, width: num.width);
   final tx = num.right + dp(8);
   _txt(c, _serverName, tx, cy + dp(6), dp(11), _cWhite);
-  _txt(c, 'ГЋNCД‚RCARE MICД‚', tx, cy + dp(22), dp(7), _cMuted, bold: false);
+  _txt(c, 'ÎNCĂRCARE MICĂ', tx, cy + dp(22), dp(7), _cMuted, bold: false);
   final pr = Rect.fromLTWH(tx, cy + dp(32), cw - dp(48), dp(3));
   c.drawRect(pr, Paint()..color = const Color(0xFF383838));
   c.drawRect(Rect.fromLTWH(pr.left, pr.top, pr.width * 0.08, pr.height), Paint()..color = _cGold);
@@ -493,7 +493,7 @@ void _lobbyPercent(Canvas c) {
   final sy = _h - pad - u * 0.21;
   _txt(c, 'Conturile noastre', pad, sy, u * 0.042, _cWhite);
   _txt(c, 'pe retelele sociale', pad, sy + u * 0.048, u * 0.042, _cWhite);
-  _txt(c, 'UrmДѓreИ™te-ne pe reИ›elele sociale И™i\nfii la curent cu noutДѓИ›ile',
+  _txt(c, 'Urmărește-ne pe rețelele sociale și\nfii la curent cu noutățile',
       pad, sy + u * 0.10, u * 0.024, _cMuted, bold: false);
   final sd = u * 0.085;
   var sx = pad;
@@ -532,7 +532,7 @@ void _lobbyPercent(Canvas c) {
   _txt(c, '#1', num.left, num.top + ch * 0.12, ch * 0.34, _cGold, align: TextAlign.center, width: num.width);
   final tx = num.right + ch * 0.18;
   _txt(c, _serverName, tx, cy + ch * 0.12, ch * 0.24, _cWhite);
-  _txt(c, 'ГЋNCД‚RCARE MICД‚', tx, cy + ch * 0.48, ch * 0.16, _cMuted, bold: false);
+  _txt(c, 'ÎNCĂRCARE MICĂ', tx, cy + ch * 0.48, ch * 0.16, _cMuted, bold: false);
   final pr = Rect.fromLTWH(tx, cy + ch * 0.78, cw - (tx - cx) - ch * 0.18, ch * 0.05);
   c.drawRect(pr, Paint()..color = const Color(0xFF383838));
   c.drawRect(Rect.fromLTWH(pr.left, pr.top, pr.width * 0.08, pr.height), Paint()..color = _cGold);
@@ -547,7 +547,7 @@ void _lobbyPercent(Canvas c) {
       ic.width * 0.44, ic.height * 0.44), tint: const Color(0xFF17191D));
   _txt(c, 'JOACA', ic.right + bh2 * 0.16, _rPlay.top + bh2 * 0.24, bh2 * 0.40, const Color(0xFF111318));
 
-  _txt(c, 'Black Moldow  вЂў  v2.0', 0, _h - pad * 0.6, u * 0.022, const Color(0xE0E0E0),
+  _txt(c, 'Black Moldow  •  v2.0', 0, _h - pad * 0.6, u * 0.022, const Color(0xE0E0E0),
       bold: false, align: TextAlign.center, width: _w);
 }
 
@@ -563,7 +563,7 @@ void _profile(Canvas c) {
   _round(c, _rNickEdit, dp(6), const Color(0x22FFFFFF), stroke: const Color(0x55FFC62E));
   _txt(c, _nick, m, y, dp(15.5), _cWhite);
   _round(c, Rect.fromLTWH(_rNickEdit.right + dp(6), y, dp(26), dp(22)), dp(5), _cGold);
-  _txt(c, 'вњЋ', _rNickEdit.right + dp(6), y + dp(1), dp(16), const Color(0xFF111318),
+  _txt(c, '✎', _rNickEdit.right + dp(6), y + dp(1), dp(16), const Color(0xFF111318),
       align: TextAlign.center, width: dp(26));
   y += dp(30);
   _txt(c, 'NV. 0', m, y, dp(9), _cWhite, bold: false);
@@ -573,7 +573,7 @@ void _profile(Canvas c) {
   c.drawRect(Rect.fromLTWH(pr.left, pr.top, pr.width * 0.01, pr.height), Paint()..color = _cGold);
   y += dp(40);
   final labels = [
-    ['Bani Г®n bancДѓ', 'LEI 0'], ['Telefon', 'Nu are'], ['CasДѓ', 'Nu are'],
+    ['Bani în bancă', 'LEI 0'], ['Telefon', 'Nu are'], ['Casă', 'Nu are'],
     ['Job', 'Nu are'], ['Familie', 'Nu are'], ['Business', 'Nu are'],
   ];
   final cw = dp(150), ch = dp(42);
@@ -585,24 +585,24 @@ void _profile(Canvas c) {
   }
   final lo = Rect.fromLTWH(m, y + 3 * (ch + dp(6)), dp(290), dp(38));
   _round(c, lo, dp(8), const Color(0xFF3A1215), stroke: const Color(0x66FF6B6B));
-  _txt(c, 'ИTERGE PERSONAJUL', lo.left, lo.top + dp(12), dp(9), _cWhite, align: TextAlign.center, width: lo.width);
+  _txt(c, 'ȘTERGE PERSONAJUL', lo.left, lo.top + dp(12), dp(9), _cWhite, align: TextAlign.center, width: lo.width);
   // Buton explicit pentru schimbarea numelui.
   final nb = Rect.fromLTWH(m, lo.bottom + dp(8), dp(290), dp(34));
   _round(c, nb, dp(8), const Color(0xFF1A1A22), stroke: const Color(0x66FFC62E));
-  _txt(c, 'SCHIMBД‚ NUMELE', nb.left, nb.top + dp(9), dp(10), _cGold,
+  _txt(c, 'SCHIMBĂ NUMELE', nb.left, nb.top + dp(9), dp(10), _cGold,
       align: TextAlign.center, width: nb.width);
   _rNickBtn = nb;
 }
 
 // ---- editor de nickname cu tastatura desenata (fara TextInputClient) ----
 void _keyTap(String label) {
-  if (label == 'вЊ«') {
+  if (label == '⌫') {
     if (_nickDraft.isNotEmpty) {
       _nickDraft = _nickDraft.substring(0, _nickDraft.length - 1);
     }
-  } else if (label == 'вђЈ') {
+  } else if (label == '␣') {
     if (_nickDraft.length < 24) _nickDraft += ' ';
-  } else if (label == 'в‡§') {
+  } else if (label == '⇧') {
     _kbShift = !_kbShift;
   } else if (label == '123') {
     _kbPage = 1;
@@ -616,7 +616,7 @@ void _keyTap(String label) {
 
 void _drawNickEditor(Canvas c) {
   c.drawRect(Offset.zero & Size(_w, _h), Paint()..color = const Color(0xF50B0B10));
-  _txt(c, 'SCHIMBД‚ NUMELE', 0, dp(44), dp(18), _cGold,
+  _txt(c, 'SCHIMBĂ NUMELE', 0, dp(44), dp(18), _cGold,
       align: TextAlign.center, width: _w);
 
   final m = dp(16);
@@ -633,13 +633,13 @@ void _drawNickEditor(Canvas c) {
   final List<List<String>> rows = _kbPage == 0
       ? [
           ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-          ['в‡§', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
-          ['123', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'вђЈ', 'вЊ«'],
+          ['⇧', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+          ['123', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '␣', '⌫'],
         ]
       : [
           ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
           ['-', '@', '_', '.', ',', '!', '?', ':', '#', '/'],
-          ['ABC', 'вђЈ', 'вЊ«'],
+          ['ABC', '␣', '⌫'],
         ];
   final kw = dp(34), kh = dp(38), gap = dp(4);
   final y0 = dp(168);
@@ -650,7 +650,7 @@ void _drawNickEditor(Canvas c) {
     for (int i = 0; i < row.length; i++) {
       final label = row[i];
       final kr = Rect.fromLTWH(x0 + i * (kw + gap), y0 + r * (kh + gap), kw, kh);
-      final hot = (label == 'в‡§' && _kbShift) || (label == 'ABC' && _kbPage == 1) ||
+      final hot = (label == '⇧' && _kbShift) || (label == 'ABC' && _kbPage == 1) ||
           (label == '123' && _kbPage == 0);
       _round(c, kr, dp(6), hot ? const Color(0x66FFC62E) : const Color(0x2EFFFFFF),
           stroke: const Color(0x22FFFFFF));
@@ -840,7 +840,7 @@ Future<List<Object?>> _manifest() async {
     final req = await client.getUrl(Uri.parse('https://resa-mp.com/api/game-files'));
     req.headers.set('Accept', 'application/json');
     final resp = await req.close();
-    if (resp.statusCode != 200) throw 'HTTP ${resp.statusCode} lista de fiИ™iere';
+    if (resp.statusCode != 200) throw 'HTTP ${resp.statusCode} lista de fișiere';
     final body = await utf8.decoder.bind(resp).join();
     final data = jsonDecode(body);
     return (data['files'] as List).cast<Object?>();
@@ -873,7 +873,7 @@ Future<void> _downloadFiles(List<Object?> files, String root) async {
       await sink.close();
       if (await out.exists()) await out.delete();
       await part.rename(out.path);
-      _status = 'Descarc fiИ™iere ${i + 1}/${files.length}';
+      _status = 'Descarc fișiere ${i + 1}/${files.length}';
       window.scheduleFrame();
     }
   } finally {
@@ -884,12 +884,12 @@ Future<void> _downloadFiles(List<Object?> files, String root) async {
 Future<void> _join() async {
   if (_joining) return;
   _joining = true;
-  _status = 'Verific fiИ™ierele jocului...';
+  _status = 'Verific fișierele jocului...';
   window.scheduleFrame();
   String root;
   try {
     root = await _installRoot();
-    _status = 'Descarc lista de fiИ™iere...';
+    _status = 'Descarc lista de fișiere...';
     window.scheduleFrame();
     final files = await _manifest();
     var missing = 0;
@@ -938,7 +938,7 @@ Future<void> _join() async {
       } else if (ok == false) {
         _status = 'Jocul nu a pornit (bridge: false)';
       } else {
-        _status = 'Jocul nu a pornit (rДѓspuns necunoscut)';
+        _status = 'Jocul nu a pornit (răspuns necunoscut)';
       }
     }
   } catch (e) {
@@ -966,7 +966,7 @@ Image? _igBg, _igSkin;
 // Dialoguri SA-MP primite de la motor in timpul jocului.
 int _igDlgId = 1;
 String _igDlgTitle = 'BLACK MOLDOW', _igDlgText = '';
-List<String> _igDlgButtons = <String>['IntrДѓ', 'Anulare'];
+List<String> _igDlgButtons = <String>['Intră', 'Anulare'];
 bool _igDlgHasInput = true;
 Rect _igDlgLoginBtn = Rect.zero;
 
@@ -1034,31 +1034,58 @@ void _igInitNative() {
 }
 
 // Citeste evenimentele din batch-ul UI al engine-ului (dialoguri etc.).
+String _igDocs = '';
+
+void _igDump(String content) {
+  final paths = <String>[
+    if (_igDocs.isNotEmpty) '$_igDocs/logcat/batch_dump.txt',
+    '${Directory.current.path}/batch_dump.txt',
+  ];
+  for (final p in paths) {
+    try {
+      File(p).writeAsStringSync(content);
+      return;
+    } catch (_) {}
+  }
+}
+
 void _igPollBatch() {
   try {
-    if (_igAcquire == null || _igBase == 0) return;
+    if (_igDocs.isEmpty) {
+      _installRoot().then((v) {
+        _igDocs = v;
+      }).catchError((_) {});
+    }
+    if (_igAcquire == null || _igBase == 0) {
+      _igDump('NO_ACQUIRE base=$_igBase');
+      return;
+    }
     // Recitest handle-ul: la pornire putea fi 0, iar nativul il seteaza mai tarziu.
     final hp = ffi.Pointer<ffi.Pointer<ffi.Void>>.fromAddress(_igBase + 0x1f4e2a0);
     final handle = hp.value;
-    if (handle == ffi.Pointer<ffi.Void>.fromAddress(0)) return;
+    if (handle == ffi.Pointer<ffi.Void>.fromAddress(0)) {
+      _igDump('NO_HANDLE base=$_igBase');
+      return;
+    }
     final batch = _igAcquire!(handle);
-    if (batch == ffi.Pointer<ffi.Void>.fromAddress(0)) return;
+    if (batch == ffi.Pointer<ffi.Void>.fromAddress(0)) {
+      _igDump('NO_BATCH handle=${handle.address}');
+      return;
+    }
     final raw = batch.cast<ffi.Uint8>().asTypedList(0x40);
     final w = batch.cast<ffi.Uint64>();
     final dbgRaw = StringBuffer('HANDLE=${handle.address} BATCH=${batch.address}\n'
         'RAW ${raw.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}\n'
         'WORDS ${List.generate(8, (i) => w[i].toRadixString(16)).join(' ')}\n');
     try {
-      File('${Directory.current.path}/Documents/logcat/batch_dump.txt')
-          .writeAsStringSync(dbgRaw.toString());
+      _igDump(dbgRaw.toString());
     } catch (_) {}
     final start = ffi.Pointer<ffi.Uint8>.fromAddress(w[5]); // +0x28
     final end = w[7]; // +0x38
     final count = (end - w[5]) ~/ 0x30;
     if (count <= 0 || count > 64) {
       try {
-        File('${Directory.current.path}/Documents/logcat/batch_dump.txt')
-            .writeAsStringSync(dbgRaw.toString() + 'COUNT=$count\n');
+        _igDump(dbgRaw.toString() + 'COUNT=$count\n');
       } catch (_) {}
       return;
     }
@@ -1094,14 +1121,12 @@ void _igPollBatch() {
       _igDialogOpen = true;
       window.scheduleFrame();
       try {
-        File('${Directory.current.path}/Documents/logcat/batch_dump.txt')
-            .writeAsStringSync(dbg.toString());
+        _igDump(dbg.toString());
       } catch (_) {}
       return;
     }
     try {
-      File('${Directory.current.path}/Documents/logcat/batch_dump.txt')
-          .writeAsStringSync(dbg.toString());
+      _igDump(dbg.toString());
     } catch (_) {}
   } catch (_) {}
 }
@@ -1148,7 +1173,7 @@ void _igSendInput(String s) {
     window.sendPlatformMessage(
         _igChan, _call('message', <String, Object?>{'message': s, 'text': s}), (_) {});
   } catch (_) {}
-  _igMessages.add('в†’ $s');
+  _igMessages.add('→ $s');
   if (_igMessages.length > 8) _igMessages.removeAt(0);
 }
 
@@ -1299,11 +1324,11 @@ void _igPill(Canvas c, Rect r, String label, {bool gold = false}) {
 }
 
 void _igKey(String k) {
-  if (k == 'вЊ«') {
+  if (k == '⌫') {
     if (_igInput.isNotEmpty) _igInput = _igInput.substring(0, _igInput.length - 1);
-  } else if (k == 'вђЈ') {
+  } else if (k == '␣') {
     if (_igInput.length < 40) _igInput += ' ';
-  } else if (k == 'в‡§') {
+  } else if (k == '⇧') {
     _igDkShift = !_igDkShift;
   } else if (k == '123') {
     _igDkPage = 1;
@@ -1391,13 +1416,13 @@ void _igDrawDialog(Canvas c) {
         Paint()..color = const Color(0xFFBA121C));
   }
 
-  _igText(c, 'Recuperare parolДѓ?', f2.right - dp(100), f2.bottom + dp(6), dp(10),
+  _igText(c, 'Recuperare parolă?', f2.right - dp(100), f2.bottom + dp(6), dp(10),
       const Color(0xB0B0B0), 'MontserratMd');
 
-  // @drawable/auth_enter_btn + text "IntrДѓ" (muller_bold 17sp)
+  // @drawable/auth_enter_btn + text "Intră" (muller_bold 17sp)
   final btn = Rect.fromLTWH(fx, f2.bottom + dp(30), fw, dp(50));
   _round(c, btn, dp(6), const Color(0xFFBA121C), stroke: const Color(0xFFFFFFFF), sw: dp(1.5));
-  _igText(c, _igDlgButtons.isNotEmpty ? _igDlgButtons[0] : 'IntrДѓ', btn.left, btn.top + dp(14),
+  _igText(c, _igDlgButtons.isNotEmpty ? _igDlgButtons[0] : 'Intră', btn.left, btn.top + dp(14),
       dp(17), const Color(0xFFFFFFFF), 'MullerBd', align: TextAlign.center, width: btn.width);
   _igDlgOK = btn;
   _igDlgCancel = Rect.fromLTWH(fx, btn.bottom + dp(8), fw, dp(28));
@@ -1409,13 +1434,13 @@ void _igDrawDialog(Canvas c) {
   final rows = _igDkPage == 0
       ? [
           ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-          ['в‡§', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
-          ['123', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'вђЈ', 'вЊ«'],
+          ['⇧', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+          ['123', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '␣', '⌫'],
         ]
       : [
           ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
           ['-', '@', '_', '.', ',', '!', '?', ':', '#', '/'],
-          ['ABC', 'вђЈ', 'вЊ«'],
+          ['ABC', '␣', '⌫'],
         ];
   final kw = dp(30), kh = dp(28), gap = dp(3);
   final y0 = _h - 3 * (kh + gap) - dp(4);
@@ -1486,13 +1511,13 @@ void _drawInGame(Canvas c) {
   // --- Stele wanted ---
   for (int k = 0; k < 6; k++) {
     final x = _w / 2 - dp(45) + k * dp(16);
-    _txt(c, 'в…', x, dp(12), dp(12),
+    _txt(c, '★', x, dp(12), dp(12),
         k < 0 ? _cGold : const Color(0x55FFFFFF), align: TextAlign.center, width: dp(14));
   }
 
   // Controalele touch (stick, sarit, lovit etc.) sunt desenate de engine.
   // Nu mai suprapunem butoane proprii peste ele.
-  // Fara buton LOGIN propriu — las doar dialogurile reale ale jocului.
+  // Fara buton LOGIN propriu � las doar dialogurile reale ale jocului.
   _igDlgLoginBtn = Rect.zero;
 
   // --- Panou chat ---
@@ -1512,7 +1537,7 @@ void _drawInGame(Canvas c) {
     _round(c, sr, dp(10), const Color(0xE0000B10), stroke: const Color(0x88FFC62E));
     _txt(c, 'BLACK MOLDOW', sr.left, sr.top + dp(12), dp(16), _cGold,
         align: TextAlign.center, width: sr.width);
-    _txt(c, 'JucДѓtori conectaИ›i', sr.left, sr.top + dp(38), dp(11), _cWhite,
+    _txt(c, 'Jucători conectați', sr.left, sr.top + dp(38), dp(11), _cWhite,
         align: TextAlign.center, width: sr.width);
   }
 
@@ -1615,5 +1640,7 @@ void main() {
   window.scheduleFrame();
   _load();
 }
+
+
 
 
