@@ -1024,11 +1024,21 @@ void _igInitNative() {
     // non-null ca is_attached sa dea true, fara a-l folosi in FFI.
     final real = hp.value;
     if (real == ffi.Pointer<ffi.Void>.fromAddress(0)) {
-      // Marcator: e scris in globalul de la g+0x2a0. acquire_batch/submit_command
-      // DOAR compara handle-ul cu acest global, nu il dereferenteaza -> sigur.
-      hp.value = malloc(16).cast<ffi.Void>();
+      // Context generos + vtable cu 16 sloturi pastrate global: nativul
+      // scrie/citeste in context, unul de 24 bytes dadea EXC_BAD_ACCESS.
+      _igCb = ffi.NativeCallable<ffi.Void Function()>.listener(() {});
+      final vt = malloc(0x80).cast<ffi.Pointer<ffi.Void>>();
+      for (int i = 0; i < 16; i++) vt[i] = _igCb!.nativeFunction.cast<ffi.Void>();
+      _igVtKept = vt.cast<ffi.Void>();
+      final ctx = malloc(0x100).cast<ffi.Uint64>();
+      ctx[0] = vt.address;
+      for (int i = 1; i < 32; i++) ctx[i] = 0;
+      _igCtxKept = ctx.cast<ffi.Void>();
+      _igConnect = lib.lookupFunction<_ConnectNative, _ConnectDart>('resa_ui_connect');
+      _igHandle = _igConnect!(1, _igCtxKept!);
+    } else {
+      _igHandle = real;
     }
-    _igHandle = hp.value;
     _igAttached = 1;
   } catch (_) {}
 }
